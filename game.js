@@ -67,6 +67,15 @@
     { name:"BOAT", emoji:"⛵", color:"#ff9b54", closed:true, pts:[[0.5,0.1],[0.5,0.62],[0.14,0.62],[0.86,0.62]] }
   ];
 
+  // maze levels: type the direction word to walk. 'S'=start, 'G'=goal, '#'=wall, '.'=open
+  const MAZES=[
+    ["S..#.","##.#.",".....",".###.","....G"],
+    ["S.#...","#.#.#.","....#.","###..G"],
+    ["S....",".###.",".#G#.","....."],
+    ["S.....","###.#.","..#.#.",".....G"]
+  ];
+  const DIR=[{w:"UP",dc:0,dr:-1,e:"⬆️"},{w:"LEFT",dc:-1,dr:0,e:"⬅️"},{w:"RIGHT",dc:1,dr:0,e:"➡️"},{w:"DOWN",dc:0,dr:1,e:"⬇️"}];
+
   // 5 worlds; each is a region on the map with 3 levels + a boss.
   const WORLDS = [
     { name:"RAINBOW MEADOW", theme:"rainbow", levels:3, boss:{word:"RAINBOW",emoji:"🌈"},
@@ -81,7 +90,7 @@
       sky:["#bfe0ff","#ffe9c9"], hill:"#f3c98a", ground:"#e0b06a", ground2:"#c8924a", deco:["🎪","🌊","🎈"], goal:"🎡" }
   ];
   const nodeMeta=[];
-  WORLDS.forEach((w,wi)=>{ for(let l=0;l<w.levels;l++) nodeMeta.push({world:wi,idx:l,boss:false,kind:(l%2===1?"dots":"race")}); nodeMeta.push({world:wi,idx:w.levels,boss:true,kind:"boss"}); });
+  WORLDS.forEach((w,wi)=>{ for(let l=0;l<w.levels;l++) nodeMeta.push({world:wi,idx:l,boss:false,kind:["race","dots","maze"][l%3]}); nodeMeta.push({world:wi,idx:w.levels,boss:true,kind:"boss"}); });
   const TOTAL_NODES = nodeMeta.length;
 
   /* ===================== STATE ===================== */
@@ -102,7 +111,7 @@
   const MAX_SKILL=16, HISTORY_LEN=6;
   let history=[];
   let cur=null, idx=0, keysCorrect=0, keysWrong=0, wrongThisTarget=0;
-  let hintTimer=null, busy=false, lastWords=[], tipT=null, currentNode=0, shiftArmed=false;
+  let hintTimer=null, busy=false, lastWords=[], tipT=null, currentNode=0, shiftArmed=false, mazeBuf="";
   const race={ len:5, step:0, paceMs:6000, rivalMs:30000, startTs:0, active:false, targetTs:0, lost:false };
 
   const buddyFace=()=>S.buddy;
@@ -152,7 +161,7 @@
     else if(SHIFT_MAP[id]!==undefined) ch=shiftArmed?SHIFT_MAP[id]:id;
     else ch=id;
     if(shiftArmed){ shiftArmed=false; updateShiftVisual(); }
-    handleChar(ch);
+    routeChar(ch);
   }
   function updateShiftVisual(){ [keyEls.SHIFT_L,keyEls.SHIFT_R].forEach(k=>{ if(k) k.classList.toggle("shift-on",shiftArmed); }); }
   function applyKeyboardReveal(){ const s=Math.round(S.skill);
@@ -275,6 +284,7 @@
     if(!scene.running) return;
     scene.t=ts;
     if(scene.kind==="dots"){ drawDotsScene(ts); scene.raf=requestAnimationFrame(drawScene); return; }
+    if(scene.kind==="maze"){ drawMazeScene(ts); scene.raf=requestAnimationFrame(drawScene); return; }
     const w=scene.world;
     // hero hop tween
     let hop=0;
@@ -364,6 +374,63 @@
     drawFloaters(ts,0);
   }
 
+  // ===== maze level: type a direction word to walk to the goal =====
+  function setupMaze(){
+    const raw=MAZES[(Math.random()*MAZES.length)|0]; const grid=raw.map(s=>s.split(""));
+    const rows=grid.length, cols=grid[0].length; let sc=0,sr=0,gc=0,gr=0;
+    for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){ if(grid[r][c]==="S"){sc=c;sr=r;} if(grid[r][c]==="G"){gc=c;gr=r;} }
+    const cs=Math.min((VW-44)/cols,(VH-22)/rows);
+    scene.mz={grid,rows,cols,c:sc,r:sr,gc,gr,cs,offX:(VW-cs*cols)/2,offY:(VH-cs*rows)/2,anim:null,bump:null};
+    mazeBuf="";
+  }
+  function mazeOpen(c,r){ const m=scene.mz; if(c<0||r<0||c>=m.cols||r>=m.rows) return false; return m.grid[r][c]!=="#"; }
+  function drawMazeScene(ts){
+    const m=scene.mz; if(!m) return;
+    const g=X.createLinearGradient(0,0,0,VH); g.addColorStop(0,"#e7e0ff"); g.addColorStop(1,"#fff0fb"); X.fillStyle=g; X.fillRect(0,0,VW,VH);
+    for(let r=0;r<m.rows;r++)for(let c=0;c<m.cols;c++){ const x=m.offX+c*m.cs,y=m.offY+r*m.cs;
+      r2(x+1,y+1,m.cs-2,m.cs-2, m.grid[r][c]==="#"?"#6b4fa0":"#ffffff"); }
+    emoji("🎁", m.offX+m.gc*m.cs+m.cs/2, m.offY+m.gr*m.cs+m.cs*0.74, m.cs*0.66);
+    let hc=m.c, hr=m.r;
+    if(m.anim){ const k=clamp((ts-m.anim.t0)/m.anim.dur,0,1); hc=lerp(m.anim.fc,m.anim.tc,k); hr=lerp(m.anim.fr,m.anim.tr,k); if(k>=1) m.anim=null; }
+    let bx=0,by=0; if(m.bump){ const k=(ts-m.bump.t0)/220; if(k>=1) m.bump=null; else { const s=Math.sin(k*Math.PI)*4; bx=m.bump.dc*s; by=m.bump.dr*s; } }
+    emoji(buddyFace(), m.offX+hc*m.cs+m.cs/2+bx, m.offY+hr*m.cs+m.cs*0.78+by, m.cs*0.8);
+  }
+  function r2(x,y,w,h,c){ X.fillStyle=c; X.fillRect(x|0,y|0,Math.ceil(w),Math.ceil(h)); }
+  function mazeKey(raw){ if(busy||scene.kind!=="maze") return; const c=String(raw||"").toUpperCase(); if(!/^[A-Z]$/.test(c)) return;
+    const buf=mazeBuf+c, cands=DIR.filter(d=>d.w.startsWith(buf));
+    if(!cands.length){ mazeBuf=""; sndWrong(); renderMaze(); return; }
+    mazeBuf=buf; sndGood();
+    const full=cands.find(d=>d.w===buf);
+    if(full){ mazeBuf=""; renderMaze(); mazeMove(full); return; }
+    renderMaze();
+  }
+  function mazeMove(d){ const m=scene.mz; const nc=m.c+d.dc, nr=m.r+d.dr;
+    if(mazeOpen(nc,nr)){ m.anim={fc:m.c,fr:m.r,tc:nc,tr:nr,t0:scene.t,dur:200}; m.c=nc; m.r=nr; sndStep();
+      S.coins=(S.coins||0)+2; $("#coins").textContent=S.coins;
+      if(m.c===m.gc && m.r===m.gr){ busy=true; sndClear(); setTimeout(()=>finishLevel(true),320); } }
+    else { m.bump={dc:d.dc,dr:d.dr,t0:scene.t}; sndWrong(); }
+  }
+  function renderMaze(){
+    applyKeyboardReveal(); kbEl.classList.remove("kb-find");
+    stageEl.innerHTML="";
+    const help=document.createElement("div"); help.className="caption"; help.textContent="Type a direction to move! 🧭"; stageEl.appendChild(help);
+    const pad=document.createElement("div"); pad.className="dpad";
+    DIR.forEach(d=>{ const chip=document.createElement("div"); chip.className="dchip d-"+d.w.toLowerCase();
+      const spelling = mazeBuf.length>0 && d.w.startsWith(mazeBuf);
+      const letters=[...d.w].map((ch,i)=>`<span class="dl${spelling&&i<mazeBuf.length?" done":spelling&&i===mazeBuf.length?" cur":""}">${ch}</span>`).join("");
+      chip.innerHTML=`<span class="darrow">${d.e}</span><span class="dword">${letters}</span>`; pad.appendChild(chip); });
+    stageEl.appendChild(pad);
+    // keyboard + finger hints
+    clearHint();
+    let nextCh="";
+    if(mazeBuf===""){ DIR.forEach(d=>{ if(keyEls[d.w[0]]) keyEls[d.w[0]].classList.add("hint"); }); }
+    else { const cand=DIR.find(d=>d.w.startsWith(mazeBuf)); if(cand){ nextCh=cand.w[mazeBuf.length]||""; if(keyEls[nextCh]) keyEls[nextCh].classList.add("hint"); } }
+    const fon=fingerOn(); $("#hands").classList.toggle("off",!fon); $("#fingerLabel").classList.toggle("off",!fon);
+    clearFinger();
+    if(fon && nextCh){ const fi=KEY_FINGER[nextCh]; if(fi){ const el=fingerEls[fi.h+"_"+fi.f]; if(el) el.classList.add("active"); const l=$("#fingerLabel"); l.textContent=(fi.h==="L"?"👈 Left ":"👉 Right ")+FINGER_NAME[fi.f]+" finger"; l.style.color=FINGER_COLOR[fi.f]; } }
+  }
+  function routeChar(ch){ if(scene.kind==="maze") mazeKey(ch); else handleChar(ch); }
+
   /* ===================== TARGET / TYPING ===================== */
   function renderTarget(){ stageEl.innerHTML="";
     const cap=document.createElement("div"); cap.className="caption";
@@ -418,6 +485,8 @@
     if(meta.kind==="dots"){
       scene.pic = DOT_PICS[(Math.random()*DOT_PICS.length)|0];
       scene.len = scene.pic.pts.length; scene.rivalOn=false; scene.stakes=false; scene.flagX=VW;
+    } else if(meta.kind==="maze"){
+      setupMaze(); scene.rivalOn=false; scene.stakes=false; scene.len=1; scene.flagX=VW;
     } else {
       scene.rivalOn = meta.kind==="race" && sk>=RIVAL_SKILL;     // race begins after key-finding + finger magic
       scene.stakes  = scene.rivalOn && sk>=STAKES_SKILL;         // real chance of losing once she's capable
@@ -426,11 +495,11 @@
     }
     race.step=0; race.active=true; race.lost=false;
     race.rivalMs=clamp(race.paceMs*scene.len*handicap(),6000,60000); race.startTs=performance.now();
-    $("#worldName").textContent = w.name + (meta.boss?"  • BOSS": meta.kind==="dots"?("  • DOTS "+(meta.idx+1)+"/"+w.levels) : ("  • "+(meta.idx+1)+"/"+w.levels));
+    $("#worldName").textContent = w.name + (meta.boss?"  • BOSS": meta.kind==="dots"?("  • DOTS "+(meta.idx+1)+"/"+w.levels) : meta.kind==="maze"?("  • MAZE "+(meta.idx+1)+"/"+w.levels) : ("  • "+(meta.idx+1)+"/"+w.levels));
     $("#coins").textContent=S.coins||0;
     document.body.style.setProperty("--bg1",w.sky[0]); document.body.style.setProperty("--bg2",w.sky[1]);
     stopMapLoop(); showScreen("game"); startSceneLoop();
-    busy=false; nextTarget();
+    busy=false; if(meta.kind==="maze"){ cur=null; renderMaze(); } else { nextTarget(); }
     if(meta.idx===0 && !meta.boss) showBanner(meta.world);
   }
 
@@ -441,12 +510,12 @@
     if(win){
       if(currentNode===S.node && S.node<TOTAL_NODES-1) S.node++;
       else if(currentNode===S.node && S.node===TOTAL_NODES-1) { /* finished all */ }
-      const isDots = scene.kind==="dots";
-      const sticker = isDots ? scene.pic.emoji : STICKERS[S.stickers.length%STICKERS.length];
+      const isDots = scene.kind==="dots", isMaze = scene.kind==="maze";
+      const sticker = isDots ? scene.pic.emoji : isMaze ? "🧩" : STICKERS[S.stickers.length%STICKERS.length];
       S.stickers.push(sticker);
-      $("#wowText").textContent = scene.isBoss ? "WORLD CLEAR!" : isDots ? ("YOU MADE A "+scene.pic.name+"!") : "LEVEL CLEAR!";
+      $("#wowText").textContent = scene.isBoss ? "WORLD CLEAR!" : isDots ? ("YOU MADE A "+scene.pic.name+"!") : isMaze ? "MAZE SOLVED!" : "LEVEL CLEAR!";
       $("#newSticker").textContent=sticker;
-      $("#gotText").textContent = (S.name?S.name+", ":"") + (isDots ? ("you drew a "+scene.pic.name.toLowerCase()+"! 🪙 "+(S.coins||0)) : ("you earned a "+sticker+" sticker! 🪙 "+(S.coins||0)));
+      $("#gotText").textContent = (S.name?S.name+", ":"") + (isDots ? ("you drew a "+scene.pic.name.toLowerCase()+"! 🪙 "+(S.coins||0)) : isMaze ? ("you found the way out! 🪙 "+(S.coins||0)) : ("you earned a "+sticker+" sticker! 🪙 "+(S.coins||0)));
       $("#keepGoingBtn").textContent="▶ Map";
       $("#keepGoingBtn").dataset.action="map";
       if(scene.isBoss){ sndBoss(); burstConfetti(80); } else { sndClear(); burstConfetti(55); }
@@ -494,7 +563,7 @@
       const meta=nodeMeta[i], w=WORLDS[meta.world]; const locked=i>S.node, done=i<S.node;
       mr(x-13,y-13,26,26, locked?"#d6cfe2":done?"#c6f0cb":"#fff4bf");
       MX.strokeStyle="#3a2a5a"; MX.lineWidth=2; MX.strokeRect(x-13,y-13,26,26);
-      if(meta.boss) memoji(w.boss.emoji,x,y+7,17); else if(locked) memoji("🔒",x,y+6,12); else if(done) memoji("⭐",x,y+7,14); else if(meta.kind==="dots") memoji("🎨",x,y+6,14); else memoji(String(meta.idx+1),x,y+6,13);
+      if(meta.boss) memoji(w.boss.emoji,x,y+7,17); else if(locked) memoji("🔒",x,y+6,12); else if(done) memoji("⭐",x,y+7,14); else if(meta.kind==="dots") memoji("🎨",x,y+6,14); else if(meta.kind==="maze") memoji("🧩",x,y+6,14); else memoji(String(meta.idx+1),x,y+6,13);
     }
     // hero on top of current node
     memoji(buddyFace(), hero.x-cam, hero.y-12, 22);
@@ -594,7 +663,7 @@
       else if(e.key==="Enter"||e.key===" "||e.key==="ArrowUp"){ e.preventDefault(); mapEnter(); }
       return;
     }
-    if(!$("#game").classList.contains("hidden")){ if(e.key===" ") e.preventDefault(); if(e.key&&e.key.length===1) handleChar(e.key); }
+    if(!$("#game").classList.contains("hidden")){ if(e.key===" ") e.preventDefault(); if(e.key&&e.key.length===1) routeChar(e.key); }
   });
 
   /* ===================== CONFETTI ===================== */

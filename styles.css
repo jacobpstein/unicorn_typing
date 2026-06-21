@@ -180,6 +180,16 @@
   /* space tile in the target row */
   .tile.space-tile { color:#b39ddb; min-width:2.4ch; opacity:.8; }
 
+  /* maze direction d-pad */
+  .dpad { display:grid; grid-template-columns:repeat(3,auto); grid-template-areas:". up ." "left . right" ". down ."; gap:6px; justify-content:center; align-items:center; margin-top:2px; }
+  .d-up{grid-area:up} .d-down{grid-area:down} .d-left{grid-area:left} .d-right{grid-area:right}
+  .dchip { display:flex; flex-direction:column; align-items:center; gap:1px; background:#fff; border:3px solid var(--frame); border-radius:9px; padding:4px 10px; box-shadow:0 4px 0 var(--frame2); min-width:62px; }
+  .darrow { font-size:1.25rem; line-height:1; }
+  .dword { font-weight:800; font-size:1rem; letter-spacing:1px; }
+  .dword .dl { color:#b39ddb; }
+  .dword .dl.done { color:var(--good); }
+  .dword .dl.cur { color:var(--btn); }
+
   /* ===== Intro / how-to-play ===== */
   #intro { justify-content:center; }
   .intro-card { max-width:600px; }
