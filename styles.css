@@ -41,8 +41,8 @@
   #nameInput:focus { border-color:var(--btn); }
 
   /* ---- Map screen ---- */
-  #map { justify-content:flex-start; padding-top:20px; }
-  .map-title { font-size: clamp(1.4rem,5vw,2.2rem); margin:6px 0 10px; color:#fff;
+  #map { justify-content:center; padding-top:14px; }
+  .map-title { font-size: clamp(1.3rem,4.5vw,2rem); margin:2px 0 8px; color:#fff;
     text-shadow:2px 2px 0 #ff5fb0, 4px 4px 0 var(--frame); }
   .map-scroll { width:100%; max-width:880px; flex:1; overflow-y:auto; padding:4px; }
   .world-block { background:var(--panel); border:4px solid var(--frame); border-radius:8px; margin:0 0 12px;
@@ -156,6 +156,21 @@
   .key.k-wide { flex:5 1 0; max-width:300px; font-size:.85rem; letter-spacing:1px; color:#6b5b95; }
   .key.k-shift { flex:1.6 1 0; max-width:96px; font-size:.85rem; background:#ece4ff; }
   .key.k-shift.shift-on { background:#ffe04d !important; box-shadow:0 0 0 4px rgba(255,224,77,.55), 0 4px 0 var(--frame2) !important; }
+  /* "find the key" mode (early levels): make the glowing key unmissable */
+  .keyboard.kb-find .key:not(.hint) { opacity:.5; }
+  .keyboard.kb-find .key.hint { transform:scale(1.16); z-index:2; }
+  .keyboard.kb-find .key.hint::after { content:'⬇'; position:absolute; top:-1.05em; left:50%; transform:translateX(-50%); font-size:1.1em; color:#ff5fb0; animation:findbounce .7s ease-in-out infinite; }
+  @keyframes findbounce { 0%,100%{ transform:translateX(-50%) translateY(0); } 50%{ transform:translateX(-50%) translateY(4px); } }
+
+  /* ===== Overworld map ===== */
+  .map-frame { position:relative; border:5px solid var(--frame); border-radius:8px; background:#101018;
+    box-shadow:0 6px 0 var(--frame2); height: clamp(170px,40vh,330px); aspect-ratio:320/150; max-width:98vw; overflow:hidden; margin-bottom:6px; }
+  #mapCanvas { width:100%; height:100%; display:block; image-rendering:pixelated; image-rendering:crisp-edges; }
+  .map-hint { font-size:.95rem; font-weight:700; opacity:.85; margin:2px 0 8px; text-align:center; }
+  .map-controls { display:flex; gap:12px; align-items:center; justify-content:center; margin-bottom:8px; }
+  .arrow-btn { font-size:1.6rem; font-weight:800; color:#fff; background:#b388ff; border:4px solid var(--frame); border-radius:10px;
+    width:64px; height:54px; cursor:pointer; box-shadow:0 6px 0 var(--frame2); line-height:1; }
+  .arrow-btn:active { transform:translateY(4px); box-shadow:0 2px 0 var(--frame2); }
   /* thumbs on the hands guide */
   .finger.thumb { width:16px; height:14px !important; border-radius:8px; align-self:flex-end; margin:0 1px; }
   .finger.thumb.active { background:var(--f-thumb); transform:translateY(-6px); }

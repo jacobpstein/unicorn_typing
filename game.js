@@ -78,7 +78,11 @@
   const SAVE_KEY="rainbowQuest.v2";
   const DEFAULT={ skill:1, buddy:"🦄", name:"", node:0, coins:0, stickers:[], muted:false, fingerHelper:true, homeMarkers:true, seenIntro:false, unlocked:{space:false,numbers:false,capitals:false,punct:false} };
   let S=load();
-  function freshUnlocked(){ return {space:false,numbers:false,capitals:false,punct:false}; }
+  function freshUnlocked(){ return {space:false,numbers:false,capitals:false,punct:false,fingerMagic:false}; }
+  // She learns where keys ARE first; proper finger placement and the racing rival
+  // unlock later so early play is about finding keys and winning, not losing.
+  const FINGER_MAGIC=4, RIVAL_SKILL=6;
+  function fingerOn(){ return S.fingerHelper && Math.round(S.skill)>=FINGER_MAGIC; }
   function load(){ let o; try{ const r=localStorage.getItem(SAVE_KEY); o=r?Object.assign({},DEFAULT,JSON.parse(r)):Object.assign({},DEFAULT); }catch(e){ o=Object.assign({},DEFAULT); }
     o.unlocked=Object.assign(freshUnlocked(), o.unlocked||{}); return o; }
   function save(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify({
@@ -141,7 +145,9 @@
     handleChar(ch);
   }
   function updateShiftVisual(){ [keyEls.SHIFT_L,keyEls.SHIFT_R].forEach(k=>{ if(k) k.classList.toggle("shift-on",shiftArmed); }); }
-  function applyKeyboardReveal(){ kbEl.classList.toggle("kb-space",S.skill>=10); kbEl.classList.toggle("kb-numbers",S.skill>=11); kbEl.classList.toggle("kb-punct",S.skill>=13); }
+  function applyKeyboardReveal(){ const s=Math.round(S.skill);
+    kbEl.classList.toggle("kb-space",s>=11); kbEl.classList.toggle("kb-numbers",s>=12); kbEl.classList.toggle("kb-punct",s>=14);
+    kbEl.classList.toggle("kb-find",s<=3); }
   function buildHands(){ const hands=$("#hands"); hands.innerHTML="";
     const make=(h,order)=>{ const hand=document.createElement("div"); hand.className="hand"; const f=document.createElement("div"); f.className="fingers";
       order.forEach(fn=>{ const el=document.createElement("i"); el.className="finger"+(fn==="thumb"?" thumb":""); el.dataset.h=h; el.dataset.f=fn; fingerEls[h+"_"+fn]=el; f.appendChild(el); });
@@ -171,7 +177,9 @@
   function clearFinger(){ Object.values(fingerEls).forEach(e=>e.classList.remove("active")); const l=$("#fingerLabel"); l.innerHTML="&nbsp;"; l.style.color=""; }
   function fingerFor(c,capStrict){ if(c===" ") return {space:true}; const ci=hintInfo(c,capStrict); if(ci.key==="SPACE") return {space:true};
     const kf=KEY_FINGER[ci.key]; if(kf) return {h:kf.h,f:kf.f,shift:ci.shift}; return null; }
-  function updateFinger(){ clearFinger(); if(!S.fingerHelper||!cur) return; const ff=fingerFor(cur.text[idx],cur.capStrict); if(!ff) return; const l=$("#fingerLabel");
+  function updateFinger(){ clearFinger();
+    const on=fingerOn(); $("#hands").classList.toggle("off",!on); $("#fingerLabel").classList.toggle("off",!on);
+    if(!on||!cur) return; const ff=fingerFor(cur.text[idx],cur.capStrict); if(!ff) return; const l=$("#fingerLabel");
     if(ff.space){ ["L_thumb","R_thumb"].forEach(k=>{ if(fingerEls[k]) fingerEls[k].classList.add("active"); }); l.textContent="👍 Thumbs — space bar!"; l.style.color="var(--f-thumb)"; return; }
     const el=fingerEls[ff.h+"_"+ff.f]; if(el) el.classList.add("active");
     let txt=(ff.h==="L"?"👈 Left ":"👉 Right ")+FINGER_NAME[ff.f]+" finger"; if(ff.shift) txt+=" + hold SHIFT";
@@ -179,19 +187,23 @@
 
   /* ===================== ADAPTIVE ENGINE ===================== */
   function stageForSkill(skill){ const s=Math.round(skill);
-    if(s<=1) return {mode:"letter",wave:1,hint:"always",desc:"Bump keys F & J"};
-    if(s===2) return {mode:"letter",wave:2,hint:"always",desc:"Home-row letters"};
-    if(s===3) return {mode:"letter",wave:3,hint:"always",desc:"+ top-row letters"};
-    if(s===4) return {mode:"letter",wave:4,hint:"delay",desc:"All letters"};
-    if(s===5) return {mode:"word",min:3,max:3,hint:"delay",desc:"3-letter words"};
-    if(s===6) return {mode:"word",min:3,max:4,hint:"delay",desc:"3–4 letter words"};
-    if(s===7) return {mode:"word",min:4,max:5,hint:"onwrong",desc:"4–5 letter words"};
-    if(s===8) return {mode:"word",min:5,max:6,hint:"onwrong",desc:"5–6 letter words"};
-    if(s===9) return {mode:"word",min:6,max:7,hint:"onwrong",desc:"Big words!"};
-    if(s===10) return {mode:"phrase",hint:"delay",desc:"Two words + SPACE bar"};
-    if(s===11) return {mode:"number",hint:"always",desc:"Numbers (counting)"};
-    if(s===12) return {mode:"capital",hint:"always",desc:"BIG letters (Shift)"};
-    if(s===13) return {mode:"punct",hint:"delay",desc:"Punctuation . , ! ?"};
+    // 1–3: "find the key" (no finger pressure, big obvious hint, no rival)
+    if(s<=1) return {mode:"letter",wave:1,hint:"always",desc:"Find the keys (F & J)"};
+    if(s===2) return {mode:"letter",wave:2,hint:"always",desc:"Find home-row keys"};
+    if(s===3) return {mode:"letter",wave:3,hint:"always",desc:"Find top-row keys"};
+    // 4–5: finger magic — now teach which finger
+    if(s===4) return {mode:"letter",wave:4,hint:"always",desc:"Finger magic — all letters"};
+    if(s===5) return {mode:"letter",wave:4,hint:"delay",desc:"All letters"};
+    // 6+: words (rival race turns on here)
+    if(s===6) return {mode:"word",min:3,max:3,hint:"delay",desc:"3-letter words"};
+    if(s===7) return {mode:"word",min:3,max:4,hint:"delay",desc:"3–4 letter words"};
+    if(s===8) return {mode:"word",min:4,max:5,hint:"onwrong",desc:"4–5 letter words"};
+    if(s===9) return {mode:"word",min:5,max:6,hint:"onwrong",desc:"5–6 letter words"};
+    if(s===10) return {mode:"word",min:6,max:7,hint:"onwrong",desc:"Big words!"};
+    if(s===11) return {mode:"phrase",hint:"delay",desc:"Two words + SPACE bar"};
+    if(s===12) return {mode:"number",hint:"always",desc:"Numbers (counting)"};
+    if(s===13) return {mode:"capital",hint:"always",desc:"BIG letters (Shift)"};
+    if(s===14) return {mode:"punct",hint:"delay",desc:"Punctuation . , ! ?"};
     return {mode:"sentence",hint:"onwrong",desc:"Mini sentences!"}; }
   function allowedLetters(wave){ let set=[]; for(let i=0;i<wave&&i<LETTER_WAVES.length;i++) set=set.concat(LETTER_WAVES[i]); return set; }
   function pickTarget(themeBias){ const st=stageForSkill(S.skill); const R=a=>a[(Math.random()*a.length)|0];
@@ -208,22 +220,25 @@
     let p,tries=0; do{ p=R(pool); tries++; }while(lastWords.includes(p[0])&&tries<12);
     lastWords.push(p[0]); if(lastWords.length>3) lastWords.shift();
     return {mode:"word",text:p[0],emoji:p[1],caption:p[0].toLowerCase(),theme:p[2],stage:st}; }
-  function checkUnlock(){ const m=stageForSkill(S.skill).mode; const map={phrase:"space",number:"numbers",capital:"capitals",punct:"punct"};
+  function checkUnlock(){
+    if(Math.round(S.skill)>=FINGER_MAGIC && S.fingerHelper && S.unlocked && !S.unlocked.fingerMagic){ S.unlocked.fingerMagic=true; save(); showPowerup("fingerMagic"); }
+    const m=stageForSkill(S.skill).mode; const map={phrase:"space",number:"numbers",capital:"capitals",punct:"punct"};
     const key=map[m]; if(key && S.unlocked && !S.unlocked[key]){ S.unlocked[key]=true; save(); showPowerup(key); } }
   function updateSkill(){ const recent=history.slice(-HISTORY_LEN); if(recent.length<3) return;
     const acc=recent.reduce((a,r)=>a+r.accuracy,0)/recent.length, ftr=recent.reduce((a,r)=>a+(r.firstTry?1:0),0)/recent.length;
     const before=Math.round(S.skill);
-    if(acc>=0.9&&ftr>=0.7) S.skill=Math.min(MAX_SKILL,S.skill+1);
-    else if(acc>=0.78) S.skill=Math.min(MAX_SKILL,S.skill+0.5);
-    else if(acc<0.5) S.skill=Math.max(1,S.skill-1);
-    else if(acc<0.65) S.skill=Math.max(1,S.skill-0.5);
+    // gentle ramp: it takes a couple of strong targets to move up a level
+    if(acc>=0.92&&ftr>=0.75) S.skill=Math.min(MAX_SKILL,S.skill+0.5);
+    else if(acc>=0.8) S.skill=Math.min(MAX_SKILL,S.skill+0.25);
+    else if(acc<0.5) S.skill=Math.max(1,S.skill-0.5);
+    else if(acc<0.65) S.skill=Math.max(1,S.skill-0.25);
     if(Math.round(S.skill)!==before) history=[]; }
   function handicap(){ const t=(clamp(S.skill,1,16)-1)/15; return 1.8-t*(1.8-1.1); }
 
   /* ===================== SCENE (8-bit canvas) ===================== */
   const canvas=$("#scene"), X=canvas.getContext("2d");
   const VW=320, VH=140, GROUND_Y=112, SEG=46;
-  const scene={ raf:0, running:false, world:null, isBoss:false, len:5,
+  const scene={ raf:0, running:false, world:null, isBoss:false, len:5, rivalOn:false,
     heroX:30, heroRenderX:30, anim:null, flagX:0, cam:0, floaters:[], bossScale:1, bossHappy:false, t:0 };
 
   function r(x,y,w,h,c){ X.fillStyle=c; X.fillRect(x|0,y|0,Math.ceil(w),Math.ceil(h)); }
@@ -238,9 +253,9 @@
     // hero hop tween
     let hop=0;
     if(scene.anim){ const k=(ts-scene.anim.t0)/scene.anim.dur; if(k>=1){ scene.heroRenderX=scene.anim.to; scene.anim=null; } else { scene.heroRenderX=lerp(scene.anim.from,scene.anim.to,k); hop=Math.sin(k*Math.PI)*16; } }
-    // rival progress (time based)
+    // rival progress (time based) — only when the racing rival is on (skill >= RIVAL_SKILL)
     let rivalX=null;
-    if(!scene.isBoss && race.active){ const p=(performance.now()-race.startTs)/race.rivalMs; rivalX=30+clamp(p,0,1)*(scene.flagX-30); if(p>=1 && !race.lost){ race.lost=true; finishLevel(false); } }
+    if(scene.rivalOn && race.active){ const p=(performance.now()-race.startTs)/race.rivalMs; rivalX=30+clamp(p,0,1)*(scene.flagX-30); if(p>=1 && !race.lost){ race.lost=true; finishLevel(false); } }
     // camera
     const maxCam=Math.max(0, scene.flagX+34-VW);
     scene.cam=clamp(scene.heroRenderX-70,0,maxCam);
@@ -335,8 +350,9 @@
 
   /* ===================== LEVEL FLOW ===================== */
   function startLevel(node){
-    currentNode=node; const meta=nodeMeta[node]; const w=WORLDS[meta.world];
-    scene.world=w; scene.isBoss=meta.boss; scene.len=meta.boss?1:5;
+    currentNode=node; const meta=nodeMeta[node]; const w=WORLDS[meta.world]; const sk=Math.round(S.skill);
+    scene.world=w; scene.isBoss=meta.boss; scene.len=meta.boss?1:(sk<RIVAL_SKILL?3:5);
+    scene.rivalOn = !meta.boss && sk>=RIVAL_SKILL;   // no losing until she's comfortable
     scene.heroX=30; scene.heroRenderX=30; scene.anim=null; scene.floaters=[]; scene.bossHappy=false;
     scene.flagX = meta.boss ? VW*0.62 : 30+scene.len*SEG+30;
     race.step=0; race.active=true; race.lost=false;
@@ -344,7 +360,7 @@
     $("#worldName").textContent = w.name + (meta.boss?"  • BOSS":"  • "+(meta.idx+1)+"/"+w.levels);
     $("#coins").textContent=S.coins||0;
     document.body.style.setProperty("--bg1",w.sky[0]); document.body.style.setProperty("--bg2",w.sky[1]);
-    showScreen("game"); startSceneLoop();
+    stopMapLoop(); showScreen("game"); startSceneLoop();
     busy=false; nextTarget();
     if(meta.idx===0 && !meta.boss) showBanner(meta.world);
   }
@@ -376,38 +392,50 @@
     setTimeout(()=>{ stopSceneLoop(); $("#celebrate").classList.remove("hidden"); }, 650);
   }
 
-  /* ===================== MAP ===================== */
-  function renderMap(){
-    const wrap=$("#mapPath"); wrap.innerHTML="";
-    let node=0;
-    WORLDS.forEach((w,wi)=>{
-      const firstNode=node;
-      const lastNode=node+w.levels; // boss index
-      const unlocked = S.node>=firstNode;
-      const block=document.createElement("div"); block.className="world-block";
-      const head=document.createElement("div"); head.className="world-head";
-      head.innerHTML=`<span>${w.goal}</span> <span>${w.name}</span> <span class="wlock">${unlocked?"":"🔒"}</span>`;
-      block.appendChild(head);
-      const nodes=document.createElement("div"); nodes.className="nodes";
-      for(let l=0;l<=w.levels;l++){
-        const ni=node; const isBoss=(l===w.levels);
-        const el=document.createElement("div"); el.className="node"+(isBoss?" boss":"");
-        if(ni<S.node) el.classList.add("done");
-        if(ni===S.node) el.classList.add("current");
-        if(ni>S.node) el.classList.add("locked");
-        el.innerHTML = ni<S.node ? "✓" : isBoss ? w.boss.emoji : "<small></small>"+(l+1);
-        if(ni===S.node){ const f=document.createElement("div"); f.className="hereflag"; f.textContent=buddyFace(); el.appendChild(f); }
-        const playable = ni<=S.node;
-        if(playable) el.addEventListener("click",()=>{ startLevel(ni); });
-        nodes.appendChild(el); node++;
-      }
-      block.appendChild(nodes); wrap.appendChild(block);
-    });
-    $("#enterBtn").textContent = S.node>=TOTAL_NODES-1 && false ? "▶ Enter" : "▶ Enter";
+  /* ===================== OVERWORLD MAP (walk with arrow keys) ===================== */
+  const mcanvas=$("#mapCanvas"), MX=mcanvas.getContext("2d");
+  const MVW=320, MVH=150, MGY=118;
+  const omap={ raf:0, running:false, pos:0, anim:null, cam:0, t:0, nodeX:[], nodeY:[] };
+  function layoutMap(){ omap.nodeX=[]; omap.nodeY=[]; const sp=48; for(let i=0;i<TOTAL_NODES;i++){ omap.nodeX[i]=34+i*sp; omap.nodeY[i]=70+Math.sin(i*0.85)*22; } }
+  function mr(x,y,w,h,c){ MX.fillStyle=c; MX.fillRect(x|0,y|0,Math.ceil(w),Math.ceil(h)); }
+  function memoji(ch,x,y,s){ MX.font=s+"px serif"; MX.textAlign="center"; MX.textBaseline="alphabetic"; MX.fillText(ch,x,y); }
+  function startMapLoop(){ if(omap.running) return; omap.running=true; omap.raf=requestAnimationFrame(drawMap); }
+  function stopMapLoop(){ omap.running=false; cancelAnimationFrame(omap.raf); }
+  function openMap(){ if(!omap.nodeX.length) layoutMap(); omap.pos=clamp(S.node,0,TOTAL_NODES-1); omap.anim=null;
+    $("#mapTitle").textContent="🗺️ "+WORLDS[nodeMeta[omap.pos].world].name; startMapLoop(); showScreen("map"); }
+  function heroXY(){ if(omap.anim){ const k=clamp((omap.t-omap.anim.t0)/omap.anim.dur,0,1); return { x:lerp(omap.nodeX[omap.anim.from],omap.nodeX[omap.anim.to],k), y:lerp(omap.nodeY[omap.anim.from],omap.nodeY[omap.anim.to],k)-Math.sin(k*Math.PI)*12, walking:true }; }
+    return { x:omap.nodeX[omap.pos], y:omap.nodeY[omap.pos], walking:false }; }
+  function drawMap(ts){ if(!omap.running) return; omap.t=ts;
+    if(omap.anim && (ts-omap.anim.t0)>=omap.anim.dur){ omap.pos=omap.anim.to; omap.anim=null; $("#mapTitle").textContent="🗺️ "+WORLDS[nodeMeta[omap.pos].world].name; }
+    const hero=heroXY(); const worldW=omap.nodeX[TOTAL_NODES-1]+50;
+    omap.cam=clamp(hero.x-MVW/2,0,Math.max(0,worldW-MVW)); const cam=omap.cam;
+    const g=MX.createLinearGradient(0,0,0,MVH); g.addColorStop(0,"#bfe3ff"); g.addColorStop(1,"#eef9ff"); MX.fillStyle=g; MX.fillRect(0,0,MVW,MVH);
+    // rolling hills
+    MX.fillStyle="#bfe9c0"; for(let i=-1;i<8;i++){ const hx=i*70-(cam*0.5)%70; MX.beginPath(); MX.arc(hx+35,MGY+8,40,Math.PI,0); MX.fill(); }
+    mr(0,MGY+6,MVW,MVH-MGY,"#8fd98a"); mr(0,MGY+6,MVW,3,"rgba(255,255,255,.3)");
+    // path between nodes (bright up to frontier, dim beyond)
+    MX.lineCap="round"; MX.lineWidth=5;
+    for(let i=0;i<TOTAL_NODES-1;i++){ MX.strokeStyle=(i<S.node)?"#e7b85e":"rgba(150,130,170,.4)"; MX.setLineDash([2,7]);
+      MX.beginPath(); MX.moveTo(omap.nodeX[i]-cam,omap.nodeY[i]); MX.lineTo(omap.nodeX[i+1]-cam,omap.nodeY[i+1]); MX.stroke(); }
+    MX.setLineDash([]);
+    // nodes
+    for(let i=0;i<TOTAL_NODES;i++){ const x=omap.nodeX[i]-cam,y=omap.nodeY[i]; if(x<-26||x>MVW+26) continue;
+      const meta=nodeMeta[i], w=WORLDS[meta.world]; const locked=i>S.node, done=i<S.node;
+      mr(x-13,y-13,26,26, locked?"#d6cfe2":done?"#c6f0cb":"#fff4bf");
+      MX.strokeStyle="#3a2a5a"; MX.lineWidth=2; MX.strokeRect(x-13,y-13,26,26);
+      if(meta.boss) memoji(w.boss.emoji,x,y+7,17); else if(locked) memoji("🔒",x,y+6,12); else if(done) memoji("⭐",x,y+7,14); else memoji(String(meta.idx+1),x,y+6,13);
+    }
+    // hero on top of current node
+    memoji(buddyFace(), hero.x-cam, hero.y-12, 22);
+    // "press play" bubble when standing still
+    if(!hero.walking){ const x=hero.x-cam, by=hero.y-50; const bw=62,bh=15; MX.fillStyle="#fff"; MX.strokeStyle="#3a2a5a"; MX.lineWidth=2; MX.fillRect(x-bw/2,by,bw,bh); MX.strokeRect(x-bw/2,by,bw,bh); MX.fillStyle="#3a2a5a"; MX.font="bold 9px ui-monospace,monospace"; MX.textAlign="center"; MX.fillText("PRESS ↵",x,by+11); }
+    omap.raf=requestAnimationFrame(drawMap);
   }
+  function mapWalk(dir){ if(omap.anim) return; const to=omap.pos+dir; if(to<0||to>=TOTAL_NODES||to>S.node) return; omap.anim={from:omap.pos,to,t0:omap.t,dur:400}; blip(560,.05,"square",.07); }
+  function mapEnter(){ if(omap.anim) return; startLevel(omap.pos); }
   function showBanner(wi){ $("#bannerWorld").textContent="WORLD "+(wi+1); $("#bannerSub").textContent=WORLDS[wi].name;
     const b=$("#banner"); b.classList.remove("hidden"); setTimeout(()=>b.classList.add("hidden"),1500); }
-  const POWER={ space:["⭐ NEW POWER-UP! ⭐","SPACE BAR — tap it with your THUMB"], numbers:["⭐ NEW POWER-UP! ⭐","NUMBERS — use the top row"], capitals:["⭐ NEW POWER-UP! ⭐","BIG letters — hold SHIFT"], punct:["⭐ NEW POWER-UP! ⭐",". , ! ?  — hold Shift for ! and ?"] };
+  const POWER={ fingerMagic:["✨ FINGER MAGIC! ✨","Now rest your hands: A S D F · J K L — we'll show the finger!"], space:["⭐ NEW POWER-UP! ⭐","SPACE BAR — tap it with your THUMB"], numbers:["⭐ NEW POWER-UP! ⭐","NUMBERS — use the top row"], capitals:["⭐ NEW POWER-UP! ⭐","BIG letters — hold SHIFT"], punct:["⭐ NEW POWER-UP! ⭐",". , ! ?  — hold Shift for ! and ?"] };
   function showPowerup(key){ const p=POWER[key]; if(!p) return; $("#bannerWorld").textContent=p[0]; $("#bannerSub").textContent=p[1];
     const b=$("#banner"); b.classList.remove("hidden"); sndClear(); burstConfetti(45); clearTimeout(showPowerup._t); showPowerup._t=setTimeout(()=>b.classList.add("hidden"),2400); }
 
@@ -426,37 +454,40 @@
       <div class="hk-space">⎵ SPACE — use your thumbs 👍</div>
     </div>`;
   }
-  function visualPlay(){ return `<div class="intro-play"><span class="glowkey">F</span><div class="ifinger">👈 use your left pointer finger</div></div>`; }
-  const INTRO=[
-    { title:"RAINBOW QUEST", text:"Sparkle the unicorn wants to RACE across magical worlds! 🌈 Type the letters to zoom ahead, collect coins, and explore. Each world ends with a friendly boss to beat with a magic word!", visual:visualStory },
-    { title:"HANDS ON HOME BASE", text:"Put BOTH hands on the keyboard like this. Left fingers rest on A S D F. Right fingers rest on J K L. Feel the little bumps on F and J — that's how you find home base without looking! 🤚", visual:visualHands },
-    { title:"READY TO RACE", text:"A key will GLOW to show what to press, and the hands show which finger to use. Keep your fingers on home base and reach from there. Ready? Let's go! 🏁", visual:visualPlay }
-  ];
-  let introStep=0;
-  function renderIntro(){ const s=INTRO[introStep]; $("#introTitle").textContent=s.title; $("#introText").textContent=s.text; $("#introVisual").innerHTML=s.visual();
-    $("#introNext").textContent = introStep===INTRO.length-1 ? "Let's go! 🏁" : "Next ▶";
-    $("#introDots").innerHTML=INTRO.map((_,i)=>`<span class="dot${i===introStep?" on":""}"></span>`).join(""); }
-  function openIntro(){ introStep=0; renderIntro(); showScreen("intro"); }
-  function finishIntro(){ S.seenIntro=true; save(); renderMap(); showScreen("map"); }
-  $("#introNext").addEventListener("click",()=>{ if(introStep<INTRO.length-1){ introStep++; renderIntro(); } else finishIntro(); });
+  function visualPlay(){ return `<div class="intro-play"><span class="glowkey">F</span><div class="ifinger">press the key that glows!</div></div>`; }
+  function visualMap(){ return `<div class="intro-story" style="font-size:2rem"><span class="rival" style="bottom:30px">🗺️</span><span class="hero">${buddyFace()}</span><span class="goal">🚩</span></div>`; }
+  const STEP_STORY={ title:"RAINBOW QUEST", text:"Race the unicorn across magical worlds! 🌈 Press letters to zoom ahead, collect coins, and explore. Each world ends with a friendly boss you beat with a magic word!", visual:visualStory };
+  const STEP_FIND={ title:"FIND THE KEY", text:"A letter pops up and its key GLOWS on the keyboard — just find it and press it! Use any finger you like to start. The more you play, the faster you'll know where every key is. 🔎", visual:visualPlay };
+  const STEP_HANDS={ title:"HANDS ON HOME BASE", text:"Later you'll rest BOTH hands here: left fingers on A S D F, right fingers on J K L. Feel the bumps on F and J to find home base without looking! 🤚", visual:visualHands };
+  const STEP_MAP={ title:"EXPLORE THE MAP", text:"Walk around the adventure map with the ⬅️ ➡️ arrow keys, then press ↵ (Enter) or SPACE to play a level. Ready? Let's go! 🗺️", visual:visualMap };
+  const INTRO=[STEP_STORY,STEP_FIND,STEP_MAP];               // gentle first run
+  const INTRO_FULL=[STEP_STORY,STEP_FIND,STEP_HANDS,STEP_MAP]; // full "how to play"
+  let introList=INTRO, introStep=0;
+  function renderIntro(){ const s=introList[introStep]; $("#introTitle").textContent=s.title; $("#introText").textContent=s.text; $("#introVisual").innerHTML=s.visual();
+    $("#introNext").textContent = introStep===introList.length-1 ? "Let's go! 🏁" : "Next ▶";
+    $("#introDots").innerHTML=introList.map((_,i)=>`<span class="dot${i===introStep?" on":""}"></span>`).join(""); }
+  function openIntro(full){ introList = full?INTRO_FULL:INTRO; introStep=0; renderIntro(); showScreen("intro"); }
+  function finishIntro(){ S.seenIntro=true; save(); openMap(); }
+  $("#introNext").addEventListener("click",()=>{ if(introStep<introList.length-1){ introStep++; renderIntro(); } else finishIntro(); });
   $("#introSkip").addEventListener("click",finishIntro);
-  $("#howtoBtn").addEventListener("click",openIntro);
+  $("#howtoBtn").addEventListener("click",()=>openIntro(true));
 
   function selectBuddy(b){ S.buddy=b; document.querySelectorAll(".buddy-btn").forEach(x=>x.classList.toggle("selected",x.dataset.buddy===b)); }
   document.querySelectorAll(".buddy-btn").forEach(b=>b.addEventListener("click",()=>selectBuddy(b.dataset.buddy)));
   selectBuddy(S.buddy); $("#nameInput").value=S.name||"";
 
-  function startGame(){ S.name=$("#nameInput").value.trim().slice(0,12); save(); audio(); if(!S.seenIntro){ openIntro(); } else { renderMap(); showScreen("map"); } }
+  function startGame(){ S.name=$("#nameInput").value.trim().slice(0,12); save(); audio(); if(!S.seenIntro){ openIntro(); } else { openMap(); } }
   $("#playBtn").addEventListener("click",startGame);
 
-  $("#enterBtn").addEventListener("click",()=>startLevel(S.node));
-  $("#mapBtn").addEventListener("click",()=>{ if(race.active){ race.active=false; stopSceneLoop(); } renderMap(); showScreen("map"); });
+  $("#enterBtn").addEventListener("click",mapEnter);
+  $("#mapLeft").addEventListener("click",()=>mapWalk(-1));
+  $("#mapRight").addEventListener("click",()=>mapWalk(1));
+  $("#mapBtn").addEventListener("click",()=>{ if(race.active){ race.active=false; stopSceneLoop(); } openMap(); });
   $("#keepGoingBtn").addEventListener("click",()=>{ $("#celebrate").classList.add("hidden"); busy=false;
-    const act=$("#keepGoingBtn").dataset.action; if(act==="retry"){ startLevel(currentNode); } else { renderMap(); showScreen("map"); } });
+    const act=$("#keepGoingBtn").dataset.action; if(act==="retry"){ startLevel(currentNode); } else { openMap(); } });
 
   // tip
-  function showTipSoon(){ if(!S.fingerHelper) return; }
-  function showTip(){ if(!S.fingerHelper) return; const t=$("#tip"); t.classList.remove("hidden"); clearTimeout(tipT); tipT=setTimeout(()=>t.classList.add("hidden"),9000); }
+  function showTip(){ if(!fingerOn()) return; const t=$("#tip"); t.classList.remove("hidden"); clearTimeout(tipT); tipT=setTimeout(()=>t.classList.add("hidden"),9000); }
   $("#tipClose").addEventListener("click",()=>$("#tip").classList.add("hidden"));
 
   // sticker book
@@ -467,7 +498,7 @@
   $("#closeBookBtn").addEventListener("click",()=>$("#book").classList.add("hidden"));
 
   // prefs / mute
-  function applyPrefs(){ $("#hands").classList.toggle("off",!S.fingerHelper); $("#fingerLabel").classList.toggle("off",!S.fingerHelper);
+  function applyPrefs(){ $("#hands").classList.toggle("off",!fingerOn()); $("#fingerLabel").classList.toggle("off",!fingerOn());
     kbEl.classList.toggle("no-home",!S.homeMarkers); $("#fingerToggle").textContent=S.fingerHelper?"On":"Off"; $("#homeToggle").textContent=S.homeMarkers?"On":"Off"; applyKeyboardReveal(); refreshMute(); }
   function refreshMute(){ $("#muteBtn").textContent=S.muted?"🔇":"🔊"; $("#muteBtn2").textContent=S.muted?"Off":"On"; }
   function toggleMute(){ S.muted=!S.muted; refreshMute(); save(); if(!S.muted) blip(660,.1,"square",.12); }
@@ -484,8 +515,16 @@
   $("#resetBtn").addEventListener("click",()=>{ localStorage.removeItem(SAVE_KEY); S=Object.assign({},DEFAULT); S.unlocked=freshUnlocked(); history=[]; lastWords=[]; race.paceMs=6000;
     applyPrefs(); selectBuddy(S.buddy); $("#grownup").classList.add("hidden"); $("#coins").textContent=0; stopSceneLoop(); race.active=false; showScreen("start"); });
 
-  // physical keyboard
-  addEventListener("keydown",e=>{ if(!$("#game").classList.contains("hidden")){ if(e.key===" ") e.preventDefault(); if(e.key&&e.key.length===1) handleChar(e.key); } });
+  // physical keyboard — drives both the overworld (arrows) and the typing levels
+  addEventListener("keydown",e=>{
+    if(!$("#map").classList.contains("hidden")){
+      if(e.key==="ArrowRight"){ e.preventDefault(); mapWalk(1); }
+      else if(e.key==="ArrowLeft"){ e.preventDefault(); mapWalk(-1); }
+      else if(e.key==="Enter"||e.key===" "||e.key==="ArrowUp"){ e.preventDefault(); mapEnter(); }
+      return;
+    }
+    if(!$("#game").classList.contains("hidden")){ if(e.key===" ") e.preventDefault(); if(e.key&&e.key.length===1) handleChar(e.key); }
+  });
 
   /* ===================== CONFETTI ===================== */
   const cc=$("#confetti"), cx=cc.getContext("2d"); let parts=[], rafOn=false;
@@ -498,5 +537,5 @@
   buildKeyboard(); buildHands(); applyPrefs(); $("#coins").textContent=S.coins||0;
   // show the F/J tip the first time she enters a level
   const _startLevel=startLevel;
-  startLevel=function(n){ _startLevel(n); if(!startLevel._tipped){ startLevel._tipped=true; showTip(); } };
+  startLevel=function(n){ _startLevel(n); if(fingerOn() && !startLevel._tipped){ startLevel._tipped=true; showTip(); } };
 })();

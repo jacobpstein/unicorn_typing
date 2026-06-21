@@ -42,14 +42,17 @@
   </div>
 </div>
 
-<!-- ============ MAP ============ -->
+<!-- ============ MAP (walkable overworld) ============ -->
 <div id="map" class="screen hidden">
-  <h1 class="map-title pixel">🗺️ Adventure Map</h1>
-  <div class="map-scroll"><div id="mapPath"></div></div>
-  <div style="display:flex; gap:12px; align-items:center;">
-    <button class="intro-link" id="howtoBtn">❔ How to play</button>
-    <button class="big-btn green" id="enterBtn">▶ Enter</button>
+  <h1 class="map-title pixel" id="mapTitle">🗺️ Adventure Map</h1>
+  <div class="map-frame"><canvas id="mapCanvas" width="320" height="150"></canvas><div class="scanlines"></div></div>
+  <p class="map-hint">⬅️ ➡️ walk &nbsp;•&nbsp; press ↵ Enter or SPACE to play</p>
+  <div class="map-controls">
+    <button class="arrow-btn" id="mapLeft">◀</button>
+    <button class="big-btn green" id="enterBtn">▶ Play</button>
+    <button class="arrow-btn" id="mapRight">▶</button>
   </div>
+  <button class="intro-link" id="howtoBtn">❔ How to play</button>
 </div>
 
 <!-- ============ GAME ============ -->
