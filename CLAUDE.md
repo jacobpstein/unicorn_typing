@@ -45,13 +45,17 @@ each world — all while the difficulty adapts and proper finger placement is ta
   `hintInfo`/`charMatches`/`fingerFor` map a target char → key + whether Shift is needed
   (capitals & `!`/`?`). Hands guide includes thumbs (space).
 - **ADAPTIVE ENGINE** — `stageForSkill` maps a continuous `S.skill` (1–16) to content +
-  hint policy: letters → words → `phrase` (space) → `number` (counting) → `capital`
-  (Shift) → `punct` → `sentence`. `pickTarget` (theme‑biased); `updateSkill` nudges from
-  rolling accuracy + first‑try rate; `checkUnlock`/`showPowerup` fire the "new power‑up"
-  banner; `handicap()` sets the unicorn's speed.
-- **INTRO** — `INTRO` steps + `visualStory`/`visualHands`/`visualPlay`; shown on first
-  play (`S.seenIntro`) and replayable from the map's "How to play". Teaches resting both
-  hands on home base.
+  hint policy. The curve **eases up to hand placement on purpose**: skill 1–3 = "find the
+  key" (finger guide OFF, one big glowing key + `⬇` via `kb-find`, dimmed others, no rival);
+  `FINGER_MAGIC` (=4) turns the finger guide on (`fingerOn()`), gated separately from the
+  `S.fingerHelper` pref; `RIVAL_SKILL` (=6) is when the racing rival (and losing) turns on
+  (`scene.rivalOn`) and levels grow from 3→5 targets. Then words → `phrase` (space) →
+  `number` → `capital` (Shift) → `punct` → `sentence`. `pickTarget` (theme‑biased);
+  `updateSkill` nudges gently (±0.25/±0.5) from rolling accuracy + first‑try rate;
+  `checkUnlock`/`showPowerup` fire the power‑up banner (incl. "FINGER MAGIC").
+- **INTRO** — gentle first‑run `INTRO` (story → "find the key" → "explore the map") vs.
+  full `INTRO_FULL` (adds the hands‑on‑home‑base step) used by the map's "How to play".
+  `visualStory`/`visualPlay`/`visualHands`/`visualMap`. Shown once via `S.seenIntro`.
 - **SCENE** — `<canvas id="scene">` (320×140 backing, upscaled `image-rendering:pixelated`)
   drawn in a rAF loop: parallax hills/clouds, checker ground, coins, goal landmark,
   the unicorn rival, the hero (the chosen buddy emoji), and the boss. Camera follows
@@ -59,7 +63,12 @@ each world — all while the difficulty adapts and proper finger placement is ta
 - **TARGET/TYPING** — `handleChar` (the core input handler, used by both physical keydown
   and on‑screen taps), `completeTarget`, hint timing in `armHint`.
 - **LEVEL FLOW** — `startLevel(node)`, `finishLevel(win)` (win → sticker + advance map
-  node; lose → gentle "try again", eases next race). **MAP** — `renderMap`, world banner.
+  node; lose → gentle "try again", eases next race).
+- **OVERWORLD MAP** — `<canvas id="mapCanvas">` walkable SMB3‑style overworld (`omap`,
+  `drawMap`, `layoutMap`): the hero stands on a node, `mapWalk(±1)` walks along the path
+  (blocked past the `S.node` frontier), `mapEnter` plays the current node. Driven by
+  ◀/▶/Enter/Space (arrow keys handled in the global `keydown`; on‑screen ◀ ▶ Play buttons
+  too). `openMap`/`stopMapLoop` start/stop its rAF loop.
 - **SCREENS/BUTTONS, CONFETTI, INIT** at the end.
 
 ## Design rules (please keep)
