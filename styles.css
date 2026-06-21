@@ -156,7 +156,10 @@
   .key.k-wide { flex:5 1 0; max-width:300px; font-size:.85rem; letter-spacing:1px; color:#6b5b95; }
   .key.k-shift { flex:1.6 1 0; max-width:96px; font-size:.85rem; background:#ece4ff; }
   .key.k-shift.shift-on { background:#ffe04d !important; box-shadow:0 0 0 4px rgba(255,224,77,.55), 0 4px 0 var(--frame2) !important; }
-  /* "find the key" mode (early levels): make the glowing key unmissable */
+  /* "find the key" mode (early levels): plain keys, NO hand-placement cues —
+     no finger colors, no home-row outlines, no F/J bumps — just the one glowing key */
+  .keyboard.kb-find .key:not(.hint):not(.tap-good):not(.tap-bad) { background:#fff !important; box-shadow:0 4px 0 var(--frame2) !important; }
+  .keyboard.kb-find .key.home::before, .keyboard.kb-find .key.bump::after { display:none !important; }
   .keyboard.kb-find .key:not(.hint) { opacity:.5; }
   .keyboard.kb-find .key.hint { transform:scale(1.16); z-index:2; }
   .keyboard.kb-find .key.hint::after { content:'⬇'; position:absolute; top:-1.05em; left:50%; transform:translateX(-50%); font-size:1.1em; color:#ff5fb0; animation:findbounce .7s ease-in-out infinite; }

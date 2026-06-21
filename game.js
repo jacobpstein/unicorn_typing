@@ -57,6 +57,16 @@
   ];
   const STICKERS=["🌈","🦄","🍓","🩰","🎡","⭐","🍦","🐬","🏰","👑","🦋","🌸","🍒","🌟","🧁","🎢","🐱","🌙"];
 
+  // connect-the-dots pictures: ordered points (normalized 0..1, y down) you reveal by typing
+  const DOT_PICS=[
+    { name:"STAR", emoji:"⭐", color:"#f2b705", closed:true, pts:[[0.5,0.06],[0.76,0.88],[0.06,0.36],[0.94,0.36],[0.24,0.88]] },
+    { name:"HEART", emoji:"❤️", color:"#ff5f8f", closed:true, pts:[[0.5,0.94],[0.1,0.48],[0.22,0.14],[0.5,0.34],[0.78,0.14],[0.9,0.48]] },
+    { name:"HOUSE", emoji:"🏠", color:"#5b8def", closed:true, pts:[[0.24,0.9],[0.24,0.44],[0.5,0.14],[0.76,0.44],[0.76,0.9]] },
+    { name:"FISH", emoji:"🐟", color:"#3bb0c9", closed:true, pts:[[0.1,0.5],[0.5,0.22],[0.95,0.14],[0.95,0.86],[0.5,0.78]] },
+    { name:"DIAMOND", emoji:"💎", color:"#56c6ff", closed:true, pts:[[0.5,0.08],[0.86,0.5],[0.5,0.92],[0.14,0.5]] },
+    { name:"BOAT", emoji:"⛵", color:"#ff9b54", closed:true, pts:[[0.5,0.1],[0.5,0.62],[0.14,0.62],[0.86,0.62]] }
+  ];
+
   // 5 worlds; each is a region on the map with 3 levels + a boss.
   const WORLDS = [
     { name:"RAINBOW MEADOW", theme:"rainbow", levels:3, boss:{word:"RAINBOW",emoji:"🌈"},
@@ -71,7 +81,7 @@
       sky:["#bfe0ff","#ffe9c9"], hill:"#f3c98a", ground:"#e0b06a", ground2:"#c8924a", deco:["🎪","🌊","🎈"], goal:"🎡" }
   ];
   const nodeMeta=[];
-  WORLDS.forEach((w,wi)=>{ for(let l=0;l<w.levels;l++) nodeMeta.push({world:wi,idx:l,boss:false}); nodeMeta.push({world:wi,idx:w.levels,boss:true}); });
+  WORLDS.forEach((w,wi)=>{ for(let l=0;l<w.levels;l++) nodeMeta.push({world:wi,idx:l,boss:false,kind:(l%2===1?"dots":"race")}); nodeMeta.push({world:wi,idx:w.levels,boss:true,kind:"boss"}); });
   const TOTAL_NODES = nodeMeta.length;
 
   /* ===================== STATE ===================== */
@@ -81,7 +91,7 @@
   function freshUnlocked(){ return {space:false,numbers:false,capitals:false,punct:false,fingerMagic:false}; }
   // She learns where keys ARE first; proper finger placement and the racing rival
   // unlock later so early play is about finding keys and winning, not losing.
-  const FINGER_MAGIC=4, RIVAL_SKILL=6;
+  const FINGER_MAGIC=4, RIVAL_SKILL=5, STAKES_SKILL=7;
   function fingerOn(){ return S.fingerHelper && Math.round(S.skill)>=FINGER_MAGIC; }
   function load(){ let o; try{ const r=localStorage.getItem(SAVE_KEY); o=r?Object.assign({},DEFAULT,JSON.parse(r)):Object.assign({},DEFAULT); }catch(e){ o=Object.assign({},DEFAULT); }
     o.unlocked=Object.assign(freshUnlocked(), o.unlocked||{}); return o; }
@@ -233,13 +243,27 @@
     else if(acc<0.5) S.skill=Math.max(1,S.skill-0.5);
     else if(acc<0.65) S.skill=Math.max(1,S.skill-0.25);
     if(Math.round(S.skill)!==before) history=[]; }
-  function handicap(){ const t=(clamp(S.skill,1,16)-1)/15; return 1.8-t*(1.8-1.1); }
+  // The unicorn's speed is the main adaptive lever: it's tied to her recent accuracy/
+  // first-try rate (and skill), so the race tightens when she's doing well and slows
+  // right down when she's struggling — she rarely loses, but it gets challenging.
+  function handicap(){
+    const t=(clamp(S.skill,1,16)-1)/15;
+    let h = 2.0 - t*(2.0-1.05);                 // bigger = slower unicorn (easier)
+    const recent=history.slice(-HISTORY_LEN);
+    if(recent.length>=3){
+      const acc=recent.reduce((a,r)=>a+r.accuracy,0)/recent.length;
+      const ftr=recent.reduce((a,r)=>a+(r.firstTry?1:0),0)/recent.length;
+      const perf=(acc+ftr)/2;
+      h *= perf>0.85?0.78 : perf>0.7?0.9 : perf<0.5?1.4 : perf<0.65?1.18 : 1;
+    }
+    return clamp(h,0.95,2.8);
+  }
 
   /* ===================== SCENE (8-bit canvas) ===================== */
   const canvas=$("#scene"), X=canvas.getContext("2d");
   const VW=320, VH=140, GROUND_Y=112, SEG=46;
-  const scene={ raf:0, running:false, world:null, isBoss:false, len:5, rivalOn:false,
-    heroX:30, heroRenderX:30, anim:null, flagX:0, cam:0, floaters:[], bossScale:1, bossHappy:false, t:0 };
+  const scene={ raf:0, running:false, world:null, isBoss:false, kind:"race", len:5, rivalOn:false, stakes:false, pic:null,
+    heroX:30, heroRenderX:30, anim:null, flagX:0, cam:0, floaters:[], fx:30, fy:GROUND_Y-30, bossScale:1, bossHappy:false, t:0 };
 
   function r(x,y,w,h,c){ X.fillStyle=c; X.fillRect(x|0,y|0,Math.ceil(w),Math.ceil(h)); }
   function emoji(ch,x,y,size){ X.font=size+"px serif"; X.textAlign="center"; X.textBaseline="alphabetic"; X.fillText(ch,x,y); }
@@ -249,17 +273,32 @@
 
   function drawScene(ts){
     if(!scene.running) return;
-    scene.t=ts; const w=scene.world;
+    scene.t=ts;
+    if(scene.kind==="dots"){ drawDotsScene(ts); scene.raf=requestAnimationFrame(drawScene); return; }
+    const w=scene.world;
     // hero hop tween
     let hop=0;
     if(scene.anim){ const k=(ts-scene.anim.t0)/scene.anim.dur; if(k>=1){ scene.heroRenderX=scene.anim.to; scene.anim=null; } else { scene.heroRenderX=lerp(scene.anim.from,scene.anim.to,k); hop=Math.sin(k*Math.PI)*16; } }
-    // rival progress (time based) — only when the racing rival is on (skill >= RIVAL_SKILL)
+    // rival progress (time based). Its SPEED always adapts (handicap/paceMs). Early race levels
+    // (below STAKES_SKILL) are confidence-builders: it stays close but can't cross first. From
+    // STAKES_SKILL up there are REAL stakes — it can actually beat her (a gentle, no-progress-lost
+    // "try again").
     let rivalX=null;
-    if(scene.rivalOn && race.active){ const p=(performance.now()-race.startTs)/race.rivalMs; rivalX=30+clamp(p,0,1)*(scene.flagX-30); if(p>=1 && !race.lost){ race.lost=true; finishLevel(false); } }
+    if(scene.rivalOn && race.active){
+      const timeP=(performance.now()-race.startTs)/race.rivalMs;
+      if(scene.stakes){
+        const p=clamp(timeP,0,1); rivalX=30+p*(scene.flagX-30);
+        if(p>=1 && !race.lost){ race.lost=true; finishLevel(false); }
+      } else {
+        const heroFrac=(scene.heroRenderX-30)/Math.max(1,scene.flagX-30);
+        rivalX=30+clamp(Math.min(timeP, heroFrac+0.34, 0.92),0,1)*(scene.flagX-30);
+      }
+    }
     // camera
     const maxCam=Math.max(0, scene.flagX+34-VW);
     scene.cam=clamp(scene.heroRenderX-70,0,maxCam);
     const cam=scene.cam;
+    scene.fx=scene.heroRenderX; scene.fy=GROUND_Y-30;
 
     // sky
     const g=X.createLinearGradient(0,0,0,VH); g.addColorStop(0,w.sky[0]); g.addColorStop(1,w.sky[1]); X.fillStyle=g; X.fillRect(0,0,VW,VH);
@@ -296,12 +335,34 @@
       emoji(buddyFace(), scene.heroRenderX-cam, GROUND_Y+6-hop, 26);
     }
 
-    // floaters (+coins)
-    scene.floaters=scene.floaters.filter(f=>{ const k=(ts-f.t0)/700; if(k>=1) return false; X.globalAlpha=1-k; X.fillStyle="#fff"; X.font="bold 11px ui-monospace,monospace"; X.textAlign="center"; X.fillText(f.txt, f.x-cam, f.y-22*k); X.globalAlpha=1; return true; });
-
+    drawFloaters(ts,cam);
     scene.raf=requestAnimationFrame(drawScene);
   }
-  function addFloater(txt){ scene.floaters.push({txt, x:scene.heroRenderX, y:GROUND_Y-30, t0:scene.t}); }
+  function drawFloaters(ts,cam){ scene.floaters=scene.floaters.filter(f=>{ const k=(ts-f.t0)/700; if(k>=1) return false; X.globalAlpha=1-k; X.fillStyle="#fff"; X.font="bold 11px ui-monospace,monospace"; X.textAlign="center"; X.textBaseline="alphabetic"; X.fillText(f.txt, f.x-cam, f.y-22*k); X.globalAlpha=1; return true; }); }
+  function addFloater(txt){ scene.floaters.push({txt, x:scene.fx, y:scene.fy, t0:scene.t}); }
+
+  // connect-the-dots level: type a target to light the next numbered dot and draw the line
+  function drawDotsScene(ts){
+    const pic=scene.pic, padX=56, padY=18;
+    const P=pic.pts.map(([nx,ny])=>[padX+nx*(VW-2*padX), padY+ny*(VH-2*padY)]);
+    const lit=race.step, done=lit>=scene.len;
+    const g=X.createLinearGradient(0,0,0,VH); g.addColorStop(0,"#eaf3ff"); g.addColorStop(1,"#fff0fb"); X.fillStyle=g; X.fillRect(0,0,VW,VH);
+    if(done){ X.fillStyle=pic.color+"44"; X.beginPath(); P.forEach((p,i)=> i?X.lineTo(p[0],p[1]):X.moveTo(p[0],p[1])); X.closePath(); X.fill(); }
+    // lines between lit dots
+    X.strokeStyle=pic.color; X.lineWidth=3; X.lineCap="round"; X.lineJoin="round"; X.beginPath();
+    for(let i=0;i<lit;i++){ const p=P[i]; if(i===0) X.moveTo(p[0],p[1]); else X.lineTo(p[0],p[1]); }
+    if(done && pic.closed) X.lineTo(P[0][0],P[0][1]);
+    X.stroke();
+    // dots
+    P.forEach((p,i)=>{ const on=i<lit, isNext=(i===lit && !done);
+      X.beginPath(); X.arc(p[0],p[1], isNext?6:5,0,7); X.fillStyle=on?pic.color:"#fff"; X.fill(); X.lineWidth=2; X.strokeStyle="#3a2a5a"; X.stroke();
+      if(isNext){ const rr=7+(Math.sin(ts/180)+1)*3; X.strokeStyle="#ff5fb0"; X.lineWidth=2; X.beginPath(); X.arc(p[0],p[1],rr,0,7); X.stroke(); }
+      if(!on){ X.fillStyle="#3a2a5a"; X.font="bold 8px ui-monospace,monospace"; X.textAlign="center"; X.textBaseline="middle"; X.fillText(String(i+1),p[0],p[1]); } });
+    X.textBaseline="alphabetic";
+    if(done){ const bob=Math.sin(ts/250)*3; emoji(pic.emoji, VW/2, VH/2+10-bob, 34); emoji("✨",VW/2-30,VH/2-14,13); emoji("✨",VW/2+30,VH/2-18,13); }
+    const nd=P[Math.min(lit,scene.len-1)]; scene.fx=nd[0]; scene.fy=nd[1]-10;
+    drawFloaters(ts,0);
+  }
 
   /* ===================== TARGET / TYPING ===================== */
   function renderTarget(){ stageEl.innerHTML="";
@@ -342,8 +403,9 @@
     const ms=performance.now()-race.targetTs; race.paceMs=clamp(race.paceMs*0.6+ms*0.4,1800,12000);
     S.coins=(S.coins||0)+4; $("#coins").textContent=S.coins; addFloater("+5🪙"); sndCoin(); save();
 
-    if(scene.isBoss){ scene.bossHappy=true; finishLevel(true); return; }
-    race.step++; const to=30+race.step*SEG; scene.anim={from:scene.heroRenderX,to,t0:scene.t,dur:430};
+    if(scene.kind==="boss"){ scene.bossHappy=true; finishLevel(true); return; }
+    race.step++;                                       // race: hop hero forward; dots: light next dot
+    if(scene.kind==="race"){ scene.anim={from:scene.heroRenderX,to:30+race.step*SEG,t0:scene.t,dur:430}; }
     if(race.step>=scene.len){ finishLevel(true); }
     else { busy=true; setTimeout(()=>{ busy=false; nextTarget(); },600); }
   }
@@ -351,13 +413,20 @@
   /* ===================== LEVEL FLOW ===================== */
   function startLevel(node){
     currentNode=node; const meta=nodeMeta[node]; const w=WORLDS[meta.world]; const sk=Math.round(S.skill);
-    scene.world=w; scene.isBoss=meta.boss; scene.len=meta.boss?1:(sk<RIVAL_SKILL?3:5);
-    scene.rivalOn = !meta.boss && sk>=RIVAL_SKILL;   // no losing until she's comfortable
-    scene.heroX=30; scene.heroRenderX=30; scene.anim=null; scene.floaters=[]; scene.bossHappy=false;
-    scene.flagX = meta.boss ? VW*0.62 : 30+scene.len*SEG+30;
+    scene.world=w; scene.isBoss=meta.boss; scene.kind=meta.kind;
+    scene.heroX=30; scene.heroRenderX=30; scene.anim=null; scene.floaters=[]; scene.bossHappy=false; scene.fx=30; scene.fy=GROUND_Y-30;
+    if(meta.kind==="dots"){
+      scene.pic = DOT_PICS[(Math.random()*DOT_PICS.length)|0];
+      scene.len = scene.pic.pts.length; scene.rivalOn=false; scene.stakes=false; scene.flagX=VW;
+    } else {
+      scene.rivalOn = meta.kind==="race" && sk>=RIVAL_SKILL;     // race begins after key-finding + finger magic
+      scene.stakes  = scene.rivalOn && sk>=STAKES_SKILL;         // real chance of losing once she's capable
+      scene.len = meta.boss?1 : (!scene.rivalOn ? 3 : (sk<=6?4:5));
+      scene.flagX = meta.boss ? VW*0.62 : 30+scene.len*SEG+30;
+    }
     race.step=0; race.active=true; race.lost=false;
     race.rivalMs=clamp(race.paceMs*scene.len*handicap(),6000,60000); race.startTs=performance.now();
-    $("#worldName").textContent = w.name + (meta.boss?"  • BOSS":"  • "+(meta.idx+1)+"/"+w.levels);
+    $("#worldName").textContent = w.name + (meta.boss?"  • BOSS": meta.kind==="dots"?("  • DOTS "+(meta.idx+1)+"/"+w.levels) : ("  • "+(meta.idx+1)+"/"+w.levels));
     $("#coins").textContent=S.coins||0;
     document.body.style.setProperty("--bg1",w.sky[0]); document.body.style.setProperty("--bg2",w.sky[1]);
     stopMapLoop(); showScreen("game"); startSceneLoop();
@@ -372,10 +441,12 @@
     if(win){
       if(currentNode===S.node && S.node<TOTAL_NODES-1) S.node++;
       else if(currentNode===S.node && S.node===TOTAL_NODES-1) { /* finished all */ }
-      const sticker=STICKERS[S.stickers.length%STICKERS.length]; S.stickers.push(sticker);
-      $("#wowText").textContent = scene.isBoss ? "WORLD CLEAR!" : "LEVEL CLEAR!";
+      const isDots = scene.kind==="dots";
+      const sticker = isDots ? scene.pic.emoji : STICKERS[S.stickers.length%STICKERS.length];
+      S.stickers.push(sticker);
+      $("#wowText").textContent = scene.isBoss ? "WORLD CLEAR!" : isDots ? ("YOU MADE A "+scene.pic.name+"!") : "LEVEL CLEAR!";
       $("#newSticker").textContent=sticker;
-      $("#gotText").textContent = (S.name?S.name+", ":"") + "you earned a "+sticker+" sticker! 🪙 "+(S.coins||0);
+      $("#gotText").textContent = (S.name?S.name+", ":"") + (isDots ? ("you drew a "+scene.pic.name.toLowerCase()+"! 🪙 "+(S.coins||0)) : ("you earned a "+sticker+" sticker! 🪙 "+(S.coins||0)));
       $("#keepGoingBtn").textContent="▶ Map";
       $("#keepGoingBtn").dataset.action="map";
       if(scene.isBoss){ sndBoss(); burstConfetti(80); } else { sndClear(); burstConfetti(55); }
@@ -423,7 +494,7 @@
       const meta=nodeMeta[i], w=WORLDS[meta.world]; const locked=i>S.node, done=i<S.node;
       mr(x-13,y-13,26,26, locked?"#d6cfe2":done?"#c6f0cb":"#fff4bf");
       MX.strokeStyle="#3a2a5a"; MX.lineWidth=2; MX.strokeRect(x-13,y-13,26,26);
-      if(meta.boss) memoji(w.boss.emoji,x,y+7,17); else if(locked) memoji("🔒",x,y+6,12); else if(done) memoji("⭐",x,y+7,14); else memoji(String(meta.idx+1),x,y+6,13);
+      if(meta.boss) memoji(w.boss.emoji,x,y+7,17); else if(locked) memoji("🔒",x,y+6,12); else if(done) memoji("⭐",x,y+7,14); else if(meta.kind==="dots") memoji("🎨",x,y+6,14); else memoji(String(meta.idx+1),x,y+6,13);
     }
     // hero on top of current node
     memoji(buddyFace(), hero.x-cam, hero.y-12, 22);
