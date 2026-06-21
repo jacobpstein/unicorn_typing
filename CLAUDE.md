@@ -48,11 +48,13 @@ each world — all while the difficulty adapts and proper finger placement is ta
   hint policy. The curve **eases up to hand placement on purpose**: skill 1–3 = "find the
   key" (finger guide OFF, one big glowing key + `⬇` via `kb-find`, dimmed others, no rival);
   `FINGER_MAGIC` (=4) turns the finger guide on (`fingerOn()`), gated separately from the
-  `S.fingerHelper` pref; `RIVAL_SKILL` (=6) is when the racing rival (and losing) turns on
-  (`scene.rivalOn`) and levels grow from 3→5 targets. Then words → `phrase` (space) →
+  `S.fingerHelper` pref; `RIVAL_SKILL` (=5) turns the racing rival on (`scene.rivalOn`).
+  The unicorn's SPEED is the main adaptive lever — `handicap()` factors in skill **and**
+  recent accuracy/first‑try. Below `STAKES_SKILL` (=7) the rival is capped so it can't cross
+  the flag first (confidence builder, never loses); at ≥7 there are **real stakes** (it can
+  win → gentle no‑progress‑lost "try again", `scene.stakes`). Then words → `phrase` (space) →
   `number` → `capital` (Shift) → `punct` → `sentence`. `pickTarget` (theme‑biased);
-  `updateSkill` nudges gently (±0.25/±0.5) from rolling accuracy + first‑try rate;
-  `checkUnlock`/`showPowerup` fire the power‑up banner (incl. "FINGER MAGIC").
+  `updateSkill` nudges gently (±0.25/±0.5); `checkUnlock`/`showPowerup` fire power‑up banners.
 - **INTRO** — gentle first‑run `INTRO` (story → "find the key" → "explore the map") vs.
   full `INTRO_FULL` (adds the hands‑on‑home‑base step) used by the map's "How to play".
   `visualStory`/`visualPlay`/`visualHands`/`visualMap`. Shown once via `S.seenIntro`.
@@ -62,8 +64,11 @@ each world — all while the difficulty adapts and proper finger placement is ta
   the hero; correct keys hop the hero forward.
 - **TARGET/TYPING** — `handleChar` (the core input handler, used by both physical keydown
   and on‑screen taps), `completeTarget`, hint timing in `armHint`.
-- **LEVEL FLOW** — `startLevel(node)`, `finishLevel(win)` (win → sticker + advance map
-  node; lose → gentle "try again", eases next race).
+- **LEVEL FLOW** — every node has a `kind`: **race** (type targets to cross the scene,
+  vs the adaptive unicorn), **dots** (connect-the-dots — type to light numbered dots and
+  reveal a picture from `DOT_PICS`; `drawDotsScene`, no rival, you keep the picture as a
+  sticker), or **boss** (cast the world word). Add new level types here. `startLevel(node)`
+  branches on kind; `completeTarget` advances differently per kind; `finishLevel(win)`.
 - **OVERWORLD MAP** — `<canvas id="mapCanvas">` walkable SMB3‑style overworld (`omap`,
   `drawMap`, `layoutMap`): the hero stands on a node, `mapWalk(±1)` walks along the path
   (blocked past the `S.node` frontier), `mapEnter` plays the current node. Driven by
