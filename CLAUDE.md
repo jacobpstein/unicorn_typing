@@ -5,12 +5,16 @@ adventure: she travels an overworld map, explores/unlocks themed worlds, collect
 coins, races a unicorn to the flag, and beats a friendly "boss" word at the end of
 each world — all while the difficulty adapts and proper finger placement is taught.
 
-## The whole app is one file
-- **`index.html`** is the entire game: HTML + CSS + vanilla JS, no build step, no
-  dependencies, no network calls. It must stay this way so a non‑technical parent can
-  just double‑click it (works over `file://`, fully offline).
-- Do **not** add frameworks, bundlers, npm, external fonts, or CDN assets. If you need
-  a font/sound/image, generate it in‑code (Web Audio, canvas) or inline it.
+## Three plain files, no build
+- **`index.html`** (markup/screens) + **`styles.css`** (all styling) + **`game.js`**
+  (all logic). Vanilla JS in one IIFE, classic `<script src>`/`<link>` — no build step,
+  no dependencies, no network calls. Works by double‑clicking `index.html` over
+  `file://`, fully offline. Keep it that way.
+- Do **not** add frameworks, bundlers, npm, external fonts, or CDN assets, and do **not**
+  switch `game.js` to an ES module (`file://` blocks module imports). If you need a
+  font/sound/image, generate it in‑code (Web Audio, canvas) or inline it.
+- Versioned at github.com/jacobpstein/unicorn_typing (`main`). Per the user's global
+  rule, never mention AI/Claude in commits, messages, or branch names.
 
 ## Run / preview
 - Simplest: open `index.html` directly in a browser.
@@ -24,20 +28,30 @@ each world — all while the difficulty adapts and proper finger placement is ta
   set an explicit size (e.g. 1024×720) before screenshotting. Coin emoji `🪙` renders
   gray in the preview's font but is a gold coin on the user's macOS.
 
-## Code map (inside the one `<script>` IIFE in `index.html`)
+## Code map (the one IIFE in `game.js`)
 - **DATA** — `LETTER_INFO` (letter → "X is for …" + emoji), `LETTER_WAVES`
-  (home‑row‑first letter unlock order), `KEY_FINGER` (key → hand+finger), `WORDS`
-  (word, emoji, theme), `WORLDS` (the 5 map regions + their boss word & palette),
-  `nodeMeta`/`TOTAL_NODES` (flattened map nodes), `STICKERS`.
-- **STATE** — `S` (persisted: skill, buddy, name, node, coins, stickers, prefs) +
-  `load`/`save`; runtime: `history`, `cur`/`idx`, `race`, `scene`.
+  (home‑row‑first letter unlock order), `KEY_FINGER` (key → hand+finger, incl. digits &
+  `, . /`), `SHIFT_MAP`, the level‑up content banks (`PHRASES`, `COUNT_EMOJI`,
+  `CAP_LETTERS`/`CAP_WORDS`, `PUNCTS`, `SENTENCES`), `WORDS`, `WORLDS` (5 map regions +
+  boss word & palette), `nodeMeta`/`TOTAL_NODES`, `STICKERS`.
+- **STATE** — `S` (persisted: skill, buddy, name, node, coins, stickers, prefs,
+  `seenIntro`, `unlocked`) + `load`/`save`; runtime: `history`, `cur`/`idx`, `race`,
+  `scene`, `shiftArmed`.
 - **AUDIO** — Web Audio square‑wave chiptune blips (`sndGood`, `sndCoin`, `sndClear`,
   `sndBoss`, …). Respects mute.
-- **KEYBOARD + HANDS** — builds the on‑screen keyboard (finger color classes, home‑row
-  outline, F/J bump markers) and the animated hands finger guide.
-- **ADAPTIVE ENGINE** — `stageForSkill` maps a continuous `S.skill` (1–12) to content +
-  hint policy; `pickTarget` (theme‑biased to the current world); `updateSkill` nudges
-  skill from rolling accuracy + first‑try rate; `handicap()` sets the unicorn's speed.
+- **KEYBOARD + HANDS** — builds the on‑screen keyboard (number row, QWERTY, bottom row
+  with `, . /`, and a Shift/Space row that reveal progressively via `applyKeyboardReveal`
+  at skill ≥10/≥11/≥13). `keyTap`/`shiftArmed` emulate Shift for on‑screen taps;
+  `hintInfo`/`charMatches`/`fingerFor` map a target char → key + whether Shift is needed
+  (capitals & `!`/`?`). Hands guide includes thumbs (space).
+- **ADAPTIVE ENGINE** — `stageForSkill` maps a continuous `S.skill` (1–16) to content +
+  hint policy: letters → words → `phrase` (space) → `number` (counting) → `capital`
+  (Shift) → `punct` → `sentence`. `pickTarget` (theme‑biased); `updateSkill` nudges from
+  rolling accuracy + first‑try rate; `checkUnlock`/`showPowerup` fire the "new power‑up"
+  banner; `handicap()` sets the unicorn's speed.
+- **INTRO** — `INTRO` steps + `visualStory`/`visualHands`/`visualPlay`; shown on first
+  play (`S.seenIntro`) and replayable from the map's "How to play". Teaches resting both
+  hands on home base.
 - **SCENE** — `<canvas id="scene">` (320×140 backing, upscaled `image-rendering:pixelated`)
   drawn in a rAF loop: parallax hills/clouds, checker ground, coins, goal landmark,
   the unicorn rival, the hero (the chosen buddy emoji), and the boss. Camera follows
