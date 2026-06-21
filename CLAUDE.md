@@ -64,11 +64,15 @@ each world — all while the difficulty adapts and proper finger placement is ta
   the hero; correct keys hop the hero forward.
 - **TARGET/TYPING** — `handleChar` (the core input handler, used by both physical keydown
   and on‑screen taps), `completeTarget`, hint timing in `armHint`.
-- **LEVEL FLOW** — every node has a `kind`: **race** (type targets to cross the scene,
-  vs the adaptive unicorn), **dots** (connect-the-dots — type to light numbered dots and
-  reveal a picture from `DOT_PICS`; `drawDotsScene`, no rival, you keep the picture as a
-  sticker), or **boss** (cast the world word). Add new level types here. `startLevel(node)`
-  branches on kind; `completeTarget` advances differently per kind; `finishLevel(win)`.
+- **LEVEL FLOW** — every node has a `kind` (cycles race→dots→maze per `l%3`, plus boss):
+  **race** (type targets to cross the scene vs the adaptive unicorn), **dots**
+  (connect-the-dots — type to light numbered dots and reveal a `DOT_PICS` picture;
+  `drawDotsScene`, no rival, keep the picture as a sticker), **maze** (type the direction
+  word UP/DOWN/LEFT/RIGHT (`DIR`) to walk a `MAZES` grid to the 🎁 goal; `setupMaze`/
+  `drawMazeScene`/`mazeKey`→`mazeMove`/`renderMaze` d-pad; `routeChar` sends keystrokes to
+  `mazeKey` instead of `handleChar`), or **boss** (cast the world word). To add a level type:
+  new `kind`, branch in `startLevel`/`drawScene`/`finishLevel`, and route input if it's not
+  the standard target-typing. Map telegraphs kinds with 🎨 (dots) / 🧩 (maze).
 - **OVERWORLD MAP** — `<canvas id="mapCanvas">` walkable SMB3‑style overworld (`omap`,
   `drawMap`, `layoutMap`): the hero stands on a node, `mapWalk(±1)` walks along the path
   (blocked past the `S.node` frontier), `mapEnter` plays the current node. Driven by
