@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>🌈 Rainbow Quest — a typing adventure 🦄</title>
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<canvas id="confetti"></canvas>
+
+<!-- ============ TITLE ============ -->
+<div id="start" class="screen">
+  <h1 class="pixel">RAINBOW<br>QUEST</h1>
+  <p class="subtitle">★ A Typing Adventure ★<br>Type to explore worlds and race the unicorn!</p>
+  <div class="panel">
+    <p class="pick-label">Pick your hero!</p>
+    <div class="buddies" id="buddies">
+      <button class="buddy-btn" data-buddy="🦄">🦄</button>
+      <button class="buddy-btn" data-buddy="🩰">🩰</button>
+      <button class="buddy-btn" data-buddy="🍓">🍓</button>
+      <button class="buddy-btn" data-buddy="🐱">🐱</button>
+      <button class="buddy-btn" data-buddy="🌈">🌈</button>
+    </div>
+    <div><input id="nameInput" type="text" placeholder="Your name (optional)" maxlength="12" autocomplete="off" /></div>
+    <div><button class="big-btn" id="playBtn">▶ Start</button></div>
+    <button class="link-btn" id="grownupLink">For grown-ups</button>
+  </div>
+</div>
+
+<!-- ============ INTRO / HOW TO PLAY ============ -->
+<div id="intro" class="screen hidden">
+  <div class="intro-card panel">
+    <div class="intro-visual" id="introVisual"></div>
+    <h2 class="intro-title pixel" id="introTitle"></h2>
+    <p class="intro-text" id="introText"></p>
+    <div class="intro-dots" id="introDots"></div>
+    <div class="intro-btns">
+      <button class="intro-link" id="introSkip">Skip</button>
+      <button class="big-btn green" id="introNext">Next ▶</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MAP ============ -->
+<div id="map" class="screen hidden">
+  <h1 class="map-title pixel">🗺️ Adventure Map</h1>
+  <div class="map-scroll"><div id="mapPath"></div></div>
+  <div style="display:flex; gap:12px; align-items:center;">
+    <button class="intro-link" id="howtoBtn">❔ How to play</button>
+    <button class="big-btn green" id="enterBtn">▶ Enter</button>
+  </div>
+</div>
+
+<!-- ============ GAME ============ -->
+<div id="game" class="screen hidden">
+  <div class="topbar">
+    <div class="hud-item" id="worldName">RAINBOW MEADOW</div>
+    <div class="hud-item">🪙 <span id="coins">0</span></div>
+    <button class="icon-btn" id="mapBtn" title="Map">🗺️</button>
+    <button class="icon-btn" id="bookBtn" title="Stickers">📖</button>
+    <button class="icon-btn" id="muteBtn" title="Sound">🔊</button>
+    <button class="icon-btn" id="gearBtn" title="Grown-ups">⚙️</button>
+  </div>
+  <div class="scene-frame">
+    <canvas id="scene" width="320" height="140"></canvas>
+    <div class="scanlines"></div>
+  </div>
+  <div class="stage" id="stage"></div>
+  <div class="hands" id="hands"></div>
+  <div class="finger-label" id="fingerLabel">&nbsp;</div>
+  <div class="keyboard" id="keyboard"></div>
+  <div id="tip" class="tip hidden">
+    <span>🤚 Rest your two pointer fingers on the bumpy keys <b>F</b> and <b>J</b> — that's home base!</span>
+    <button class="tip-x" id="tipClose">✕</button>
+  </div>
+</div>
+
+<!-- ============ CELEBRATION ============ -->
+<div id="celebrate" class="overlay hidden">
+  <p class="wow pixel" id="wowText">LEVEL CLEAR!</p>
+  <div class="new-sticker" id="newSticker">🌈</div>
+  <p class="got" id="gotText"></p>
+  <button class="big-btn green" id="keepGoingBtn">▶ Map</button>
+</div>
+
+<!-- ============ WORLD BANNER ============ -->
+<div id="banner" class="overlay hidden"><div class="banner-inner pixel"><p id="bannerWorld">WORLD 1</p><p id="bannerSub">Rainbow Meadow</p></div></div>
+
+<!-- ============ STICKER BOOK ============ -->
+<div id="book" class="hidden">
+  <div class="panel">
+    <h2 style="margin-top:0">⭐ Sticker Book ⭐</h2>
+    <div class="sticker-grid" id="stickerGrid"></div>
+    <button class="big-btn" id="closeBookBtn">Back</button>
+  </div>
+</div>
+
+<!-- ============ GROWN-UP ============ -->
+<div id="grownup" class="hidden">
+  <div class="panel">
+    <h2>For grown-ups 👋</h2>
+    <p><b>Rainbow Quest</b> is a typing adventure. She travels an overworld map, exploring and unlocking themed worlds, collecting coins, and beating a friendly "boss" word at the end of each world. Every correct key moves her hero forward and races a unicorn to the flag.</p>
+    <p><b>It adapts automatically:</b> word difficulty, the unicorn's speed, and how many hints show all adjust from her accuracy and first-try rate — easing back when she struggles, pushing when she's winning. Losing a race never blocks her; it just eases the next try.</p>
+    <p><b>Good habits:</b> keys are color-coded by finger, the home row (with the F &amp; J bumps) is outlined, and the hands guide shows which finger to use.</p>
+    <div class="row"><span>Level: <b id="levelBadge">1</b></span><span id="levelDesc" style="opacity:.7;font-size:.85rem"></span></div>
+    <div class="row"><span>Sound</span><button class="mini-btn" id="muteBtn2">On</button></div>
+    <div class="row"><span>Finger helper (hands)</span><button class="mini-btn" id="fingerToggle">On</button></div>
+    <div class="row"><span>Home-row guides</span><button class="mini-btn" id="homeToggle">On</button></div>
+    <div class="row"><span>Make it easier / harder</span><span><button class="mini-btn" id="easierBtn">– easier</button> <button class="mini-btn" id="harderBtn">harder +</button></span></div>
+    <div class="row"><span>Reset everything</span><button class="mini-btn danger" id="resetBtn">Reset</button></div>
+    <button class="big-btn" id="closeGearBtn" style="margin-top:8px">Done</button>
+  </div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
