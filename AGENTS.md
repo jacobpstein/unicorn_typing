@@ -8,7 +8,8 @@ This file is just the orientation + the non‑negotiables.
 - Three plain files, no build: `index.html` (markup) + `styles.css` (styles) + `game.js`
   (all logic, one IIFE). Open `index.html` directly to run it.
 - It's an 8‑bit overworld adventure: walk a map (arrow keys) → play levels of varied
-  **kinds** (race / connect‑the‑dots / maze / boss) → adaptive difficulty teaches typing.
+  **kinds** — a Mario‑style typing **platformer** (the main path) plus connect‑the‑dots /
+  maze side quests and a boss. Adaptive difficulty teaches typing.
 - `CLAUDE.md` has the code map, recipes for adding level types/worlds/content, and the
   design intent ("learning through play", ease up to hand placement, never punishing).
 

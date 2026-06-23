@@ -1,9 +1,10 @@
 # 🌈 Rainbow Quest — a typing adventure 🦄
 
-A browser game that teaches a young child (~5 yrs) to type. It's an 8‑bit‑styled
-adventure: walk an overworld map, explore and unlock themed worlds, collect coins, play
-a variety of level types, and beat a friendly "boss" word at the end of each world — while
-the difficulty quietly adapts and proper finger placement is eased in over time.
+A browser game that teaches a young child (~5 yrs) to type. It's an 8‑bit, Mario‑style
+**typing platformer**: walk an overworld map and play side‑scrolling levels where you type
+to run, jump and zap a unicorn through obstacles to the flag — with maze and connect‑the‑dots
+levels as side quests, and a friendly "boss" word ending each world. The difficulty quietly
+adapts and proper finger placement is eased in over time.
 
 Built for one specific kid and tuned through play‑testing, so the guiding principle is
 **"learning through play"** — it should feel like a game, not homework.
@@ -27,14 +28,14 @@ on screen, so it works on a touchscreen or trackpad too.
 
 ### Level types
 
-The levels rotate through different kinds so it never feels repetitive (the map shows each
-node's icon so you know what's coming):
+The main path is the platformer; side quests are sprinkled in so it never feels repetitive
+(the map shows each node's icon so you know what's coming):
 
 | Icon | Type | What she does |
 |------|------|---------------|
-| 1,2,3 | 🏁 **Race** | Type the targets to dash across the scene and beat the unicorn to the flag. |
-| 🎨 | **Connect‑the‑dots** | Type targets to light numbered dots one by one and reveal a picture (star, heart, house, fish…). She keeps the picture as a sticker. |
-| 🧩 | **Maze** | Type a **direction word** — `UP` / `DOWN` / `LEFT` / `RIGHT` — to walk her character through a maze to the 🎁 goal. |
+| 1,2,3 | 🦄 **Platformer** (main) | A side‑scrolling level. Type a letter (or, once she can spell, an **action word** like `JUMP`, `ZAP`, `HOP`) to make the unicorn leap gaps, bop baddies, bump ? blocks, grab coins, and reach the flagpole. |
+| 🎨 | **Connect‑the‑dots** (side quest) | Type targets to light numbered dots one by one and reveal a picture (star, heart, house, fish…). She keeps the picture as a sticker. |
+| 🧩 | **Maze** (side quest) | Type a **direction word** — `UP` / `DOWN` / `LEFT` / `RIGHT` — to walk her character through a maze to the 🎁 goal. |
 | 🌈/🦄/… | 👾 **Boss** | At the end of each world, "cast the spell" by typing the world's word (RAINBOW, UNICORN…). |
 
 ## How the difficulty works (and why it's gentle)
@@ -46,11 +47,9 @@ node's icon so you know what's coming):
 - **It adapts automatically.** It watches her accuracy and first‑try rate and moves a hidden
   skill level up/down — growing from single letters → words → spaces → numbers → capitals
   (Shift) → punctuation → mini‑sentences. The on‑screen keyboard grows with her.
-- **The unicorn's speed is the main challenge dial**, and **she basically can't lose early.**
-  Real stakes (the unicorn can actually beat her) only kick in once she's genuinely capable —
-  and even then a loss costs **no progress**, just a friendly "try again."
-- **Never punishing.** No timers that fail her, no "game over," no lost progress. Mistakes
-  just reveal a hint.
+- **Never punishing.** No timers that fail her, no "game over," no lost progress, no losing a
+  level. Mistakes just reveal a hint. The challenge is the typing and the obstacles — not a
+  clock or a rival.
 
 There's a **"For grown‑ups"** panel (⚙️) to toggle sound, the finger helper, or the home‑row
 guides, nudge the difficulty easier/harder, or reset.

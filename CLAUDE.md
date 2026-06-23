@@ -1,9 +1,10 @@
 # Rainbow Quest — a typing adventure
 
-A browser game that teaches a young child (≈5 yrs) to type. It's an 8‑bit‑styled
-adventure: she travels an overworld map, explores/unlocks themed worlds, collects
-coins, races a unicorn to the flag, and beats a friendly "boss" word at the end of
-each world — all while the difficulty adapts and proper finger placement is taught.
+A browser game that teaches a young child (≈5 yrs) to type. It's an 8‑bit Mario‑style
+**typing platformer**: she walks an overworld map and plays side‑scrolling levels where
+she types to run, jump and zap a unicorn through obstacles to the flag — with **maze** and
+**connect‑the‑dots** levels as side quests, and a friendly "boss" word ending each world.
+The difficulty adapts and proper finger placement is eased in over time.
 
 ## Three plain files, no build
 - **`index.html`** (markup/screens) + **`styles.css`** (all styling) + **`game.js`**
@@ -57,33 +58,39 @@ each world — all while the difficulty adapts and proper finger placement is ta
   thumbs (space).
 - **ADAPTIVE ENGINE** — `stageForSkill` maps a continuous `S.skill` (1–16) to content +
   hint policy. The curve **eases up to hand placement on purpose**: skill 1–3 = "find the
-  key" (finger guide OFF, one big glowing key + `⬇` via `kb-find`, dimmed others, no rival);
+  key" (finger guide OFF, one big glowing key + `⬇` via `kb-find`, dimmed others);
   `FINGER_MAGIC` (=4) turns the finger guide on (`fingerOn()`), gated separately from the
-  `S.fingerHelper` pref; `RIVAL_SKILL` (=5) turns the racing rival on (`scene.rivalOn`).
-  The unicorn's SPEED is the main adaptive lever — `handicap()` factors in skill **and**
-  recent accuracy/first‑try. Below `STAKES_SKILL` (=7) the rival is capped so it can't cross
-  the flag first (confidence builder, never loses); at ≥7 there are **real stakes** (it can
-  win → gentle no‑progress‑lost "try again", `scene.stakes`). Then words → `phrase` (space) →
-  `number` → `capital` (Shift) → `punct` → `sentence`. `pickTarget` (theme‑biased);
-  `updateSkill` nudges gently (±0.25/±0.5); `checkUnlock`/`showPowerup` fire power‑up banners.
+  `S.fingerHelper` pref. Then letters → words → `phrase` (space) → `number` → `capital`
+  (Shift) → `punct` → `sentence`. In the platformer, word‑stage targets become **action
+  words** (`ACTIONS`) matched to each obstacle (`platTarget`); the maze/dots use `pickTarget`
+  (theme‑biased). `updateSkill` nudges gently (±0.25/±0.5) from rolling accuracy + first‑try
+  rate; `checkUnlock`/`showPowerup` fire power‑up banners (incl. "FINGER MAGIC"). There is no
+  rival/timer — difficulty is content, not speed; levels are never lost.
 - **INTRO** — gentle first‑run `INTRO` (story → "find the key" → "explore the map") vs.
   full `INTRO_FULL` (adds the hands‑on‑home‑base step) used by the map's "How to play".
   `visualStory`/`visualPlay`/`visualHands`/`visualMap`. Shown once via `S.seenIntro`.
 - **SCENE** — `<canvas id="scene">` (320×140 backing, upscaled `image-rendering:pixelated`)
-  drawn in a rAF loop: parallax hills/clouds, checker ground, coins, goal landmark,
-  the unicorn rival, the hero (the chosen buddy emoji), and the boss. Camera follows
-  the hero; correct keys hop the hero forward.
+  drawn in a rAF loop: parallax hills/clouds, checker ground, and (for the platformer)
+  obstacles + a flagpole, or (for the boss) the boss creature. The hero (chosen buddy emoji)
+  hops obstacle‑to‑obstacle as she types; `scene.anim.arc` sets the jump height (big over a
+  gap/spring). Camera follows the hero.
 - **TARGET/TYPING** — `handleChar` (the core input handler, used by both physical keydown
   and on‑screen taps), `completeTarget`, hint timing in `armHint`.
-- **LEVEL FLOW** — every node has a `kind` (cycles race→dots→maze per `l%3`, plus boss):
-  **race** (type targets to cross the scene vs the adaptive unicorn), **dots**
-  (connect-the-dots — type to light numbered dots and reveal a `DOT_PICS` picture;
-  `drawDotsScene`, no rival, keep the picture as a sticker), **maze** (type the direction
-  word UP/DOWN/LEFT/RIGHT (`DIR`) to walk a `MAZES` grid to the 🎁 goal; `setupMaze`/
-  `drawMazeScene`/`mazeKey`→`mazeMove`/`renderMaze` d-pad; `routeChar` sends keystrokes to
-  `mazeKey` instead of `handleChar`), or **boss** (cast the world word). To add a level type:
-  new `kind`, branch in `startLevel`/`drawScene`/`finishLevel`, and route input if it's not
-  the standard target-typing. Map telegraphs kinds with 🎨 (dots) / 🧩 (maze).
+- **LEVEL FLOW** — every node has a `kind`. The **main path is `plat`** (even levels); odd
+  levels are **side quests** alternating `dots` / `maze`; each world ends in a `boss`.
+  - **plat** (platformer, the headline level type): `scene.stations` is an array of obstacle
+    types from `OBS` (`coin`/`enemy`/`block`/`gap`/`spring`). Each obstacle's typing target
+    comes from `platTarget` (a single letter for beginners, else an `ACTIONS` word like JUMP/
+    ZAP). `completeTarget` hops the hero to the next station with an obstacle‑specific arc and
+    fires `platEffect`; clearing the last one runs her to the flagpole. Rendered inline in
+    `drawScene` (pits, ? blocks, foes via `foeFor`, springs, coins, flagpole).
+  - **dots** = connect‑the‑dots (`DOT_PICS`, `drawDotsScene`; keep the picture as a sticker).
+  - **maze** = type UP/DOWN/LEFT/RIGHT (`DIR`/`MAZES`) to walk to the 🎁 goal (`setupMaze`/
+    `drawMazeScene`/`mazeKey`→`mazeMove`/`renderMaze`; `routeChar` routes keys to `mazeKey`).
+  - **boss** = cast the world word.
+  To add a level type: new `kind`, branch in `startLevel`/`drawScene`/`finishLevel`/`nextTarget`,
+  and route input in `routeChar` if it isn't standard target‑typing. Map telegraphs kinds:
+  number (plat) / 🎨 (dots) / 🧩 (maze) / boss emoji.
 - **OVERWORLD MAP** — `<canvas id="mapCanvas">` walkable SMB3‑style overworld (`omap`,
   `drawMap`, `layoutMap`): the hero stands on a node, `mapWalk(±1)` walks along the path
   (blocked past the `S.node` frontier), `mapEnter` plays the current node. Driven by
@@ -93,23 +100,24 @@ each world — all while the difficulty adapts and proper finger placement is ta
 
 ## Extending the game (common tasks)
 - **Add a new level type (`kind`).** This is the most requested kind of work. (1) give some
-  nodes the new kind in the `nodeMeta` builder (currently `["race","dots","maze"][l%3]`);
-  (2) in `startLevel`, add an `else if(meta.kind==="…")` branch that sets up its state on
-  `scene` (and `scene.rivalOn=false` unless it's a race); (3) add a draw branch at the top
-  of `drawScene` (e.g. `if(scene.kind==="…"){ drawYourScene(ts); … return; }`); (4) decide
-  how input works — if it's standard "type the shown target" it can reuse `handleChar`/
-  `completeTarget`; if it's custom (like the maze), write your own input fn and route to it
-  in `routeChar`; (5) handle the win in `finishLevel` (wow text + sticker); (6) give it a
-  map icon in `drawMap`. The **maze** is the best worked example of a fully custom kind.
+  nodes the new kind in the `nodeMeta` builder (currently platformer on even levels, dots/maze
+  side quests on odd); (2) in `startLevel`, add an `else if(meta.kind==="…")` branch that sets
+  up its state on `scene`; (3) add a draw branch in `drawScene` (e.g.
+  `if(scene.kind==="…"){ drawYourScene(ts); … return; }`); (4) decide how input works — if it's
+  standard "type the shown target" it can reuse `handleChar`/`completeTarget`; if it's custom
+  (like the maze), write your own input fn and route to it in `routeChar`; (5) handle the win
+  in `finishLevel`; (6) give it a map icon in `drawMap`. The **maze** is the best worked
+  example of a fully custom kind; the **platformer** shows obstacle variety + animation.
 - **Add words / phrases / pictures / mazes.** Just append to the `WORDS`, `PHRASES`,
   `DOT_PICS`, `MAZES`, etc. arrays in DATA — keep them on‑theme (rainbows/unicorns/fruit/
   ballet/Coney Island) and age‑appropriate. Mazes are ASCII grids (`S` start, `G` goal,
   `#` wall, `.` open) — verify a path exists and keep the solution short (~6–9 moves).
 - **Add a world.** Append to `WORLDS` (name, theme, `levels`, `boss` word+emoji, sky/ground
   palette, deco, goal emoji). `nodeMeta`/`TOTAL_NODES` and the map rebuild from it.
-- **Tune difficulty.** The knobs are the `FINGER_MAGIC` / `RIVAL_SKILL` / `STAKES_SKILL`
-  constants, `stageForSkill` (content per skill), `updateSkill` (how fast skill moves), and
-  `handicap()` (unicorn speed).
+- **Add platformer obstacles / action words.** Append to `OBS` (obstacle types) and give each
+  a `drawScene` case + a `platEffect` case; add matching control words to `ACTIONS`.
+- **Tune difficulty.** The knobs are the `FINGER_MAGIC` constant, `stageForSkill` (content per
+  skill), `updateSkill` (how fast skill moves), and `scene.len` in `startLevel` (level length).
 
 ## Design direction (the "why" — honor this)
 The user is building this for his ~5‑year‑old daughter and has steered it through play‑testing.
@@ -120,15 +128,16 @@ Internalize these so you don't undo hard‑won decisions:
 - **Ease *up to* hand placement, don't lead with it.** Early levels are pure "find the key"
   (no finger guide, no finger colors, no home‑row/F‑J cues — `kb-find`). Proper finger
   technique unlocks later as "FINGER MAGIC". Don't push finger placement in the first levels.
-- **The unicorn's *speed* is the adaptive lever**, not just word length. And **she basically
-  never loses early** (rival capped < `STAKES_SKILL`); **real stakes** kick in only once she's
-  capable, and even then a loss costs no progress ("try again").
-- **Keep adding level variety** when asked — past requests: connect‑the‑dots, the direction
-  maze. Open ideas floated but not built: "pop the balloons", a spelling‑bee level.
+- **It's a platformer, not a race.** The user found the old "race the unicorn" levels boring
+  and asked for a Mario‑style typing platformer (`plat`) as the main level type, with maze &
+  connect‑the‑dots as side quests. The racing rival was removed. Difficulty is *content*
+  (letters → action words), never a speed/timer; **levels are never lost.**
+- **Keep adding level variety** when asked — built so far: platformer, connect‑the‑dots,
+  direction maze. Open ideas floated but not built: "pop the balloons", a spelling‑bee level.
 
 ## Design rules (please keep)
-- **Never punishing.** No timers that fail her, no "game over", no lost progress. A lost
-  race just offers "try again" and eases up. Mistakes reveal the hint, never scold.
+- **Never punishing.** No timers that fail her, no "game over", no lost progress, no losing a
+  level. Mistakes just reveal the hint, never scold.
 - **Adaptive, not fixed levels.** Difficulty follows `S.skill`; the map is a separate
   *exploration/progression* layer, not the difficulty driver.
 - **Teach real typing.** Keep the finger color‑coding, home‑row/F‑J bump guides, and the

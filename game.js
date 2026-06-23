@@ -76,6 +76,19 @@
   ];
   const DIR=[{w:"UP",dc:0,dr:-1,e:"⬆️"},{w:"LEFT",dc:-1,dr:0,e:"⬅️"},{w:"RIGHT",dc:1,dr:0,e:"➡️"},{w:"DOWN",dc:0,dr:1,e:"⬇️"}];
 
+  // platformer: obstacle types + the "control words" she types to make the unicorn act on each.
+  // (Beginners type single letters; once she can spell, these action words drive the obstacle.)
+  const OBS=["coin","enemy","block","gap","spring"];
+  const ACTIONS={
+    gap:["HOP","JUMP","LEAP","JUMP","BOUNCE"],
+    enemy:["ZAP","BOP","POW","BONK","ZAP","POUNCE"],
+    block:["HIT","BONK","BUMP","SMASH"],
+    coin:["GET","GRAB","SCOOP","GRAB"],
+    spring:["UP","FLY","BOING","BOUNCE","FLY"],
+    run:["RUN","GO","DASH","ZOOM","GALLOP"]
+  };
+  const FOES={ rainbow:["🌧️","☁️","💨"], unicorn:["👾","🦇","🌑"], fruit:["🐛","🐌","🐝"], ballet:["🌀","🦗","🐞"], coney:["🦀","🐙","🦑"] };
+
   // 5 worlds; each is a region on the map with 3 levels + a boss.
   const WORLDS = [
     { name:"RAINBOW MEADOW", theme:"rainbow", levels:3, boss:{word:"RAINBOW",emoji:"🌈"},
@@ -90,7 +103,8 @@
       sky:["#bfe0ff","#ffe9c9"], hill:"#f3c98a", ground:"#e0b06a", ground2:"#c8924a", deco:["🎪","🌊","🎈"], goal:"🎡" }
   ];
   const nodeMeta=[];
-  WORLDS.forEach((w,wi)=>{ for(let l=0;l<w.levels;l++) nodeMeta.push({world:wi,idx:l,boss:false,kind:["race","dots","maze"][l%3]}); nodeMeta.push({world:wi,idx:w.levels,boss:true,kind:"boss"}); });
+  // Platformer is the main path; odd levels are side quests (alternating connect-the-dots / maze).
+  WORLDS.forEach((w,wi)=>{ for(let l=0;l<w.levels;l++){ const kind = (l%2===1) ? (((wi+Math.floor(l/2))%2===0)?"dots":"maze") : "plat"; nodeMeta.push({world:wi,idx:l,boss:false,kind}); } nodeMeta.push({world:wi,idx:w.levels,boss:true,kind:"boss"}); });
   const TOTAL_NODES = nodeMeta.length;
 
   /* ===================== STATE ===================== */
@@ -98,9 +112,9 @@
   const DEFAULT={ skill:1, buddy:"🦄", name:"", node:0, coins:0, stickers:[], muted:false, fingerHelper:true, homeMarkers:true, seenIntro:false, unlocked:{space:false,numbers:false,capitals:false,punct:false} };
   let S=load();
   function freshUnlocked(){ return {space:false,numbers:false,capitals:false,punct:false,fingerMagic:false}; }
-  // She learns where keys ARE first; proper finger placement and the racing rival
-  // unlock later so early play is about finding keys and winning, not losing.
-  const FINGER_MAGIC=4, RIVAL_SKILL=5, STAKES_SKILL=7;
+  // She learns where keys ARE first; proper finger placement ("finger magic") unlocks
+  // later, so the earliest levels are just about finding keys.
+  const FINGER_MAGIC=4;
   function fingerOn(){ return S.fingerHelper && Math.round(S.skill)>=FINGER_MAGIC; }
   function load(){ let o; try{ const r=localStorage.getItem(SAVE_KEY); o=r?Object.assign({},DEFAULT,JSON.parse(r)):Object.assign({},DEFAULT); }catch(e){ o=Object.assign({},DEFAULT); }
     o.unlocked=Object.assign(freshUnlocked(), o.unlocked||{}); return o; }
@@ -112,10 +126,9 @@
   let history=[];
   let cur=null, idx=0, keysCorrect=0, keysWrong=0, wrongThisTarget=0;
   let hintTimer=null, busy=false, lastWords=[], tipT=null, currentNode=0, shiftArmed=false, mazeBuf="";
-  const race={ len:5, step:0, paceMs:6000, rivalMs:30000, startTs:0, active:false, targetTs:0, lost:false };
+  const race={ step:0, active:false };   // step = current obstacle/target index within the level
 
   const buddyFace=()=>S.buddy;
-  const rivalEmoji=()=> S.buddy==="🦄" ? "🌈" : "🦄";
 
   /* ===================== AUDIO (chiptune-ish) ===================== */
   let actx=null;
@@ -206,14 +219,14 @@
 
   /* ===================== ADAPTIVE ENGINE ===================== */
   function stageForSkill(skill){ const s=Math.round(skill);
-    // 1–3: "find the key" (no finger pressure, big obvious hint, no rival)
+    // 1–3: "find the key" (no finger pressure, one big obvious glowing key)
     if(s<=1) return {mode:"letter",wave:1,hint:"always",desc:"Find the keys (F & J)"};
     if(s===2) return {mode:"letter",wave:2,hint:"always",desc:"Find home-row keys"};
     if(s===3) return {mode:"letter",wave:3,hint:"always",desc:"Find top-row keys"};
     // 4–5: finger magic — now teach which finger
     if(s===4) return {mode:"letter",wave:4,hint:"always",desc:"Finger magic — all letters"};
     if(s===5) return {mode:"letter",wave:4,hint:"delay",desc:"All letters"};
-    // 6+: words (rival race turns on here)
+    // 6+: words (in the platformer these become action words like JUMP / ZAP)
     if(s===6) return {mode:"word",min:3,max:3,hint:"delay",desc:"3-letter words"};
     if(s===7) return {mode:"word",min:3,max:4,hint:"delay",desc:"3–4 letter words"};
     if(s===8) return {mode:"word",min:4,max:5,hint:"onwrong",desc:"4–5 letter words"};
@@ -252,26 +265,12 @@
     else if(acc<0.5) S.skill=Math.max(1,S.skill-0.5);
     else if(acc<0.65) S.skill=Math.max(1,S.skill-0.25);
     if(Math.round(S.skill)!==before) history=[]; }
-  // The unicorn's speed is the main adaptive lever: it's tied to her recent accuracy/
-  // first-try rate (and skill), so the race tightens when she's doing well and slows
-  // right down when she's struggling — she rarely loses, but it gets challenging.
-  function handicap(){
-    const t=(clamp(S.skill,1,16)-1)/15;
-    let h = 2.0 - t*(2.0-1.05);                 // bigger = slower unicorn (easier)
-    const recent=history.slice(-HISTORY_LEN);
-    if(recent.length>=3){
-      const acc=recent.reduce((a,r)=>a+r.accuracy,0)/recent.length;
-      const ftr=recent.reduce((a,r)=>a+(r.firstTry?1:0),0)/recent.length;
-      const perf=(acc+ftr)/2;
-      h *= perf>0.85?0.78 : perf>0.7?0.9 : perf<0.5?1.4 : perf<0.65?1.18 : 1;
-    }
-    return clamp(h,0.95,2.8);
-  }
 
   /* ===================== SCENE (8-bit canvas) ===================== */
   const canvas=$("#scene"), X=canvas.getContext("2d");
   const VW=320, VH=140, GROUND_Y=112, SEG=46;
-  const scene={ raf:0, running:false, world:null, isBoss:false, kind:"race", len:5, rivalOn:false, stakes:false, pic:null,
+  const PSTART=24, PSEG=54;                 // platformer: hero start x, spacing between obstacle stations
+  const scene={ raf:0, running:false, world:null, isBoss:false, kind:"plat", len:5, pic:null, stations:[],
     heroX:30, heroRenderX:30, anim:null, flagX:0, cam:0, floaters:[], fx:30, fy:GROUND_Y-30, bossScale:1, bossHappy:false, t:0 };
 
   function r(x,y,w,h,c){ X.fillStyle=c; X.fillRect(x|0,y|0,Math.ceil(w),Math.ceil(h)); }
@@ -288,22 +287,7 @@
     const w=scene.world;
     // hero hop tween
     let hop=0;
-    if(scene.anim){ const k=(ts-scene.anim.t0)/scene.anim.dur; if(k>=1){ scene.heroRenderX=scene.anim.to; scene.anim=null; } else { scene.heroRenderX=lerp(scene.anim.from,scene.anim.to,k); hop=Math.sin(k*Math.PI)*16; } }
-    // rival progress (time based). Its SPEED always adapts (handicap/paceMs). Early race levels
-    // (below STAKES_SKILL) are confidence-builders: it stays close but can't cross first. From
-    // STAKES_SKILL up there are REAL stakes — it can actually beat her (a gentle, no-progress-lost
-    // "try again").
-    let rivalX=null;
-    if(scene.rivalOn && race.active){
-      const timeP=(performance.now()-race.startTs)/race.rivalMs;
-      if(scene.stakes){
-        const p=clamp(timeP,0,1); rivalX=30+p*(scene.flagX-30);
-        if(p>=1 && !race.lost){ race.lost=true; finishLevel(false); }
-      } else {
-        const heroFrac=(scene.heroRenderX-30)/Math.max(1,scene.flagX-30);
-        rivalX=30+clamp(Math.min(timeP, heroFrac+0.34, 0.92),0,1)*(scene.flagX-30);
-      }
-    }
+    if(scene.anim){ const k=(ts-scene.anim.t0)/scene.anim.dur; if(k>=1){ scene.heroRenderX=scene.anim.to; scene.anim=null; } else { scene.heroRenderX=lerp(scene.anim.from,scene.anim.to,k); hop=Math.sin(k*Math.PI)*(scene.anim.arc||16); } }
     // camera
     const maxCam=Math.max(0, scene.flagX+34-VW);
     scene.cam=clamp(scene.heroRenderX-70,0,maxCam);
@@ -333,16 +317,22 @@
       emoji(buddyFace(), 60, GROUND_Y+6-hop, 26);
       emoji("⭐", 60, GROUND_Y-22-hop, 10);
     } else {
-      // coins along the path
-      for(let i=0;i<scene.len;i++){ if(race.step>i) continue; const cxw=30+(i+0.7)*SEG; const cx=cxw-cam; if(cx<-12||cx>VW+12) continue;
-        const bobv=Math.sin(ts/200+i)*3; const sw=3+Math.round(2*Math.abs(Math.cos(ts/180+i)));
-        r(cx-sw, GROUND_Y-26+bobv, sw*2, 12, "#ffcf33"); r(cx-1, GROUND_Y-24+bobv, 2, 8, "#fff3a8"); }
-      // goal flag / landmark
-      const fx=scene.flagX-cam; if(fx<VW+30){ emoji(scene.world.goal, fx+6, GROUND_Y+8, 30); r(fx-8,GROUND_Y-30,2,38,"#888"); emoji("🚩",fx,GROUND_Y-22,12); }
-      // rival
-      if(rivalX!=null){ const rx=rivalX-cam; emoji(rivalEmoji(), rx, GROUND_Y+2, 18); }
-      // hero
-      emoji(buddyFace(), scene.heroRenderX-cam, GROUND_Y+6-hop, 26);
+      // ===== platformer: pits, obstacles, flagpole, hero with jump arc =====
+      // pits (gaps): carve an abyss into the ground
+      for(let i=0;i<scene.len;i++){ if(scene.stations[i]!=="gap") continue; const ox=PSTART+i*PSEG+PSEG/2-cam; if(ox<-30||ox>VW+30) continue;
+        r(ox-18, GROUND_Y+8, 36, VH-GROUND_Y-8, w.sky[1]); r(ox-18,GROUND_Y+8,3,VH-GROUND_Y-8,"rgba(0,0,0,.18)"); r(ox+15,GROUND_Y+8,3,VH-GROUND_Y-8,"rgba(0,0,0,.18)"); }
+      // obstacles (cleared ones: enemy/coin vanish, block goes empty, gap stays a pit, spring stays)
+      for(let i=0;i<scene.len;i++){ const type=scene.stations[i], cleared=i<race.step; const ox=PSTART+i*PSEG+PSEG/2-cam; if(ox<-24||ox>VW+24) continue;
+        const bob=Math.sin(ts/200+i)*3;
+        if(type==="coin"){ if(!cleared){ const sw=3+Math.round(2*Math.abs(Math.cos(ts/180+i))); r(ox-sw,GROUND_Y-26+bob,sw*2,12,"#ffcf33"); r(ox-1,GROUND_Y-24+bob,2,8,"#fff3a8"); } }
+        else if(type==="enemy"){ if(!cleared) emoji(foeFor(i), ox, GROUND_Y+8+Math.sin(ts/180+i)*1.5, 17); }
+        else if(type==="block"){ r(ox-9,GROUND_Y-30,18,18, cleared?"#b08a5a":"#e0a83c"); r(ox-9,GROUND_Y-30,18,3,cleared?"#caa472":"#ffd86a"); if(!cleared){ X.fillStyle="#7a5c00"; X.font="bold 12px ui-monospace,monospace"; X.textAlign="center"; X.textBaseline="middle"; X.fillText("?",ox,GROUND_Y-20); X.textBaseline="alphabetic"; } }
+        else if(type==="spring"){ r(ox-8,GROUND_Y+2,16,6,"#9a7fd0"); r(ox-8,GROUND_Y+1,16,2,"#c4aef0"); }
+      }
+      // flagpole goal (Mario-style)
+      const fx=scene.flagX-cam; if(fx>-24 && fx<VW+24){ r(fx,GROUND_Y-46,2,54,"#9a9a9a"); emoji("🚩",fx+7,GROUND_Y-34,12); emoji(scene.world.goal, fx+4, GROUND_Y+8, 22); }
+      // hero (hop reflects the jump arc set on scene.anim)
+      emoji(buddyFace(), scene.heroRenderX-cam, GROUND_Y+8-hop, 24);
     }
 
     drawFloaters(ts,cam);
@@ -350,6 +340,21 @@
   }
   function drawFloaters(ts,cam){ scene.floaters=scene.floaters.filter(f=>{ const k=(ts-f.t0)/700; if(k>=1) return false; X.globalAlpha=1-k; X.fillStyle="#fff"; X.font="bold 11px ui-monospace,monospace"; X.textAlign="center"; X.textBaseline="alphabetic"; X.fillText(f.txt, f.x-cam, f.y-22*k); X.globalAlpha=1; return true; }); }
   function addFloater(txt){ scene.floaters.push({txt, x:scene.fx, y:scene.fy, t0:scene.t}); }
+  function foeFor(i){ const arr=FOES[scene.world.theme]||["👾"]; return arr[i%arr.length]; }
+  // platformer target: the obstacle's "control word" (or a single letter for beginners)
+  function platTarget(obType){ const st=stageForSkill(S.skill); const R=a=>a[(Math.random()*a.length)|0];
+    if(st.mode==="letter"){ const pool=allowedLetters(st.wave); const ch=R(pool); const[w,e]=LETTER_INFO[ch];
+      return {mode:"letter",text:ch,emoji:e,caption:`${ch} is for ${w}`,stage:st,action:obType}; }
+    let pool=ACTIONS[obType]||ACTIONS.run;
+    if(st.min){ const f=pool.filter(x=>x.length>=st.min&&x.length<=st.max); if(f.length) pool=f; }
+    const word=R(pool);
+    return {mode:"word",text:word,emoji:"",caption:word.toLowerCase(),stage:st,action:obType,plat:true}; }
+  // little burst when an obstacle is cleared
+  function platEffect(type,i){ const ox=PSTART+i*PSEG+PSEG/2;
+    if(type==="enemy"){ scene.floaters.push({txt:"💥",x:ox,y:GROUND_Y-12,t0:scene.t}); }
+    else if(type==="block"){ scene.floaters.push({txt:"🪙",x:ox,y:GROUND_Y-34,t0:scene.t}); }
+    else if(type==="coin"){ scene.floaters.push({txt:"🪙",x:ox,y:GROUND_Y-26,t0:scene.t}); }
+    else if(type==="spring"){ scene.floaters.push({txt:"✨",x:ox,y:GROUND_Y-30,t0:scene.t}); } }
 
   // connect-the-dots level: type a target to light the next numbered dot and draw the line
   function drawDotsScene(ts){
@@ -447,9 +452,10 @@
     const mode=cur.stage.hint; if(mode==="always") showKeyHint(); else if(mode==="delay") hintTimer=setTimeout(showKeyHint, fresh?2600:1500); }
 
   function nextTarget(){
-    if(scene.isBoss){ const b=scene.world.boss; cur={mode:"word",text:b.word,emoji:b.emoji,caption:b.word.toLowerCase(),stage:{mode:"word",hint:"always"},boss:true}; }
+    if(scene.kind==="boss"){ const b=scene.world.boss; cur={mode:"word",text:b.word,emoji:b.emoji,caption:b.word.toLowerCase(),stage:{mode:"word",hint:"always"},boss:true}; }
+    else if(scene.kind==="plat"){ cur=platTarget(scene.stations[race.step]||"coin"); }
     else cur=pickTarget(scene.world.theme);
-    idx=0; keysCorrect=0; keysWrong=0; wrongThisTarget=0; race.targetTs=performance.now();
+    idx=0; keysCorrect=0; keysWrong=0; wrongThisTarget=0;
     applyKeyboardReveal(); renderTarget(); armHint(true);
   }
 
@@ -467,12 +473,22 @@
   function completeTarget(){ clearHint(); if(hintTimer) clearTimeout(hintTimer); refreshTiles(); sndStep();
     const total=keysCorrect+keysWrong, accuracy=total?keysCorrect/total:1;
     history.push({accuracy,firstTry:wrongThisTarget===0}); updateSkill(); checkUnlock(); applyKeyboardReveal();
-    const ms=performance.now()-race.targetTs; race.paceMs=clamp(race.paceMs*0.6+ms*0.4,1800,12000);
     S.coins=(S.coins||0)+4; $("#coins").textContent=S.coins; addFloater("+5🪙"); sndCoin(); save();
 
     if(scene.kind==="boss"){ scene.bossHappy=true; finishLevel(true); return; }
-    race.step++;                                       // race: hop hero forward; dots: light next dot
-    if(scene.kind==="race"){ scene.anim={from:scene.heroRenderX,to:30+race.step*SEG,t0:scene.t,dur:430}; }
+    if(scene.kind==="plat"){
+      const cleared=scene.stations[race.step]; race.step++;
+      const reached=race.step>=scene.len;
+      const to = reached ? scene.flagX : PSTART+race.step*PSEG;
+      const arc = cleared==="gap"?28 : cleared==="spring"?40 : 16;
+      scene.anim={from:scene.heroRenderX,to,t0:scene.t,dur:reached?540:430,arc};
+      platEffect(cleared, race.step-1);
+      busy=true;
+      if(reached){ setTimeout(()=>finishLevel(true), 580); } else { setTimeout(()=>{ busy=false; nextTarget(); },560); }
+      return;
+    }
+    // dots: light next dot (drawDotsScene reads race.step)
+    race.step++;
     if(race.step>=scene.len){ finishLevel(true); }
     else { busy=true; setTimeout(()=>{ busy=false; nextTarget(); },600); }
   }
@@ -481,20 +497,20 @@
   function startLevel(node){
     currentNode=node; const meta=nodeMeta[node]; const w=WORLDS[meta.world]; const sk=Math.round(S.skill);
     scene.world=w; scene.isBoss=meta.boss; scene.kind=meta.kind;
-    scene.heroX=30; scene.heroRenderX=30; scene.anim=null; scene.floaters=[]; scene.bossHappy=false; scene.fx=30; scene.fy=GROUND_Y-30;
+    scene.heroX=PSTART; scene.heroRenderX=PSTART; scene.anim=null; scene.floaters=[]; scene.bossHappy=false; scene.fx=PSTART; scene.fy=GROUND_Y-30;
     if(meta.kind==="dots"){
       scene.pic = DOT_PICS[(Math.random()*DOT_PICS.length)|0];
-      scene.len = scene.pic.pts.length; scene.rivalOn=false; scene.stakes=false; scene.flagX=VW;
+      scene.len = scene.pic.pts.length; scene.flagX=VW;
     } else if(meta.kind==="maze"){
-      setupMaze(); scene.rivalOn=false; scene.stakes=false; scene.len=1; scene.flagX=VW;
-    } else {
-      scene.rivalOn = meta.kind==="race" && sk>=RIVAL_SKILL;     // race begins after key-finding + finger magic
-      scene.stakes  = scene.rivalOn && sk>=STAKES_SKILL;         // real chance of losing once she's capable
-      scene.len = meta.boss?1 : (!scene.rivalOn ? 3 : (sk<=6?4:5));
-      scene.flagX = meta.boss ? VW*0.62 : 30+scene.len*SEG+30;
+      setupMaze(); scene.len=1; scene.flagX=VW;
+    } else if(meta.boss){
+      scene.len=1; scene.stations=[]; scene.flagX=VW*0.62;
+    } else { // platformer (the main level type)
+      scene.len = sk<=3?4 : sk<=6?5 : 6;
+      scene.stations=[]; for(let i=0;i<scene.len;i++) scene.stations.push(OBS[(Math.random()*OBS.length)|0]);
+      scene.flagX = PSTART + scene.len*PSEG + 40;
     }
-    race.step=0; race.active=true; race.lost=false;
-    race.rivalMs=clamp(race.paceMs*scene.len*handicap(),6000,60000); race.startTs=performance.now();
+    race.step=0; race.active=true;
     $("#worldName").textContent = w.name + (meta.boss?"  • BOSS": meta.kind==="dots"?("  • DOTS "+(meta.idx+1)+"/"+w.levels) : meta.kind==="maze"?("  • MAZE "+(meta.idx+1)+"/"+w.levels) : ("  • "+(meta.idx+1)+"/"+w.levels));
     $("#coins").textContent=S.coins||0;
     document.body.style.setProperty("--bg1",w.sky[0]); document.body.style.setProperty("--bg2",w.sky[1]);
@@ -503,31 +519,18 @@
     if(meta.idx===0 && !meta.boss) showBanner(meta.world);
   }
 
-  function finishLevel(win){
+  function finishLevel(){     // levels are never lost — clearing always advances
     if(!race.active) return; race.active=false;
     clearHint(); clearFinger(); if(hintTimer) clearTimeout(hintTimer); busy=true;
-    const meta=nodeMeta[currentNode], w=WORLDS[meta.world];
-    if(win){
-      if(currentNode===S.node && S.node<TOTAL_NODES-1) S.node++;
-      else if(currentNode===S.node && S.node===TOTAL_NODES-1) { /* finished all */ }
-      const isDots = scene.kind==="dots", isMaze = scene.kind==="maze";
-      const sticker = isDots ? scene.pic.emoji : isMaze ? "🧩" : STICKERS[S.stickers.length%STICKERS.length];
-      S.stickers.push(sticker);
-      $("#wowText").textContent = scene.isBoss ? "WORLD CLEAR!" : isDots ? ("YOU MADE A "+scene.pic.name+"!") : isMaze ? "MAZE SOLVED!" : "LEVEL CLEAR!";
-      $("#newSticker").textContent=sticker;
-      $("#gotText").textContent = (S.name?S.name+", ":"") + (isDots ? ("you drew a "+scene.pic.name.toLowerCase()+"! 🪙 "+(S.coins||0)) : isMaze ? ("you found the way out! 🪙 "+(S.coins||0)) : ("you earned a "+sticker+" sticker! 🪙 "+(S.coins||0)));
-      $("#keepGoingBtn").textContent="▶ Map";
-      $("#keepGoingBtn").dataset.action="map";
-      if(scene.isBoss){ sndBoss(); burstConfetti(80); } else { sndClear(); burstConfetti(55); }
-    } else {
-      race.paceMs=clamp(race.paceMs*1.18,1800,12000);
-      $("#wowText").textContent="SO CLOSE!";
-      $("#newSticker").textContent=rivalEmoji()+"💨";
-      $("#gotText").textContent="The unicorn zoomed ahead — try again!";
-      $("#keepGoingBtn").textContent="▶ Try again";
-      $("#keepGoingBtn").dataset.action="retry";
-      sndWrong(); burstConfetti(14);
-    }
+    if(currentNode===S.node && S.node<TOTAL_NODES-1) S.node++;
+    const isDots = scene.kind==="dots", isMaze = scene.kind==="maze";
+    const sticker = isDots ? scene.pic.emoji : isMaze ? "🧩" : STICKERS[S.stickers.length%STICKERS.length];
+    S.stickers.push(sticker);
+    $("#wowText").textContent = scene.isBoss ? "WORLD CLEAR!" : isDots ? ("YOU MADE A "+scene.pic.name+"!") : isMaze ? "MAZE SOLVED!" : "LEVEL CLEAR!";
+    $("#newSticker").textContent=sticker;
+    $("#gotText").textContent = (S.name?S.name+", ":"") + (isDots ? ("you drew a "+scene.pic.name.toLowerCase()+"! 🪙 "+(S.coins||0)) : isMaze ? ("you found the way out! 🪙 "+(S.coins||0)) : ("you earned a "+sticker+" sticker! 🪙 "+(S.coins||0)));
+    $("#keepGoingBtn").textContent="▶ Map"; $("#keepGoingBtn").dataset.action="map";
+    if(scene.isBoss){ sndBoss(); burstConfetti(80); } else { sndClear(); burstConfetti(55); }
     save();
     setTimeout(()=>{ stopSceneLoop(); $("#celebrate").classList.remove("hidden"); }, 650);
   }
@@ -583,7 +586,7 @@
   function showScreen(name){ ["start","intro","map","game"].forEach(s=>$("#"+s).classList.toggle("hidden", s!==name)); }
 
   /* ===================== INTRO / HOW-TO-PLAY ===================== */
-  function visualStory(){ return `<div class="intro-story"><span class="dust">💨</span><span class="rival">${rivalEmoji()}</span><span class="hero">${buddyFace()}</span><span class="goal">🏁</span></div>`; }
+  function visualStory(){ return `<div class="intro-story"><span class="dust">✨</span><span class="rival" style="bottom:34px">🪙</span><span class="hero">${buddyFace()}</span><span class="goal">🚩</span></div>`; }
   function visualHands(){
     const L=[["A","pinky"],["S","ring"],["D","middle"],["F","index"]], Rr=[["J","index"],["K","middle"],["L","ring"],[";","pinky"]];
     const keys=arr=>arr.map(([c,f])=>`<span class="hk-key f-${f}${(c==="F"||c==="J")?" bump":""}">${c}</span>`).join("");
@@ -596,7 +599,7 @@
   }
   function visualPlay(){ return `<div class="intro-play"><span class="glowkey">F</span><div class="ifinger">press the key that glows!</div></div>`; }
   function visualMap(){ return `<div class="intro-story" style="font-size:2rem"><span class="rival" style="bottom:30px">🗺️</span><span class="hero">${buddyFace()}</span><span class="goal">🚩</span></div>`; }
-  const STEP_STORY={ title:"RAINBOW QUEST", text:"Race the unicorn across magical worlds! 🌈 Press letters to zoom ahead, collect coins, and explore. Each world ends with a friendly boss you beat with a magic word!", visual:visualStory };
+  const STEP_STORY={ title:"RAINBOW QUEST", text:"Run and jump your unicorn through magical worlds! 🌈 Press letters (and later words like JUMP and ZAP) to leap over gaps, bop baddies, and grab coins. Take on maze & dot‑to‑dot side‑quests, and beat the boss in each world!", visual:visualStory };
   const STEP_FIND={ title:"FIND THE KEY", text:"A letter pops up and its key GLOWS on the keyboard — just find it and press it! Use any finger you like to start. The more you play, the faster you'll know where every key is. 🔎", visual:visualPlay };
   const STEP_HANDS={ title:"HANDS ON HOME BASE", text:"Later you'll rest BOTH hands here: left fingers on A S D F, right fingers on J K L. Feel the bumps on F and J to find home base without looking! 🤚", visual:visualHands };
   const STEP_MAP={ title:"EXPLORE THE MAP", text:"Walk around the adventure map with the ⬅️ ➡️ arrow keys, then press ↵ (Enter) or SPACE to play a level. Ready? Let's go! 🗺️", visual:visualMap };
@@ -652,7 +655,7 @@
   $("#closeGearBtn").addEventListener("click",()=>$("#grownup").classList.add("hidden"));
   $("#easierBtn").addEventListener("click",()=>{ S.skill=Math.max(1,S.skill-1); history=[]; applyKeyboardReveal(); save(); openGear(); if(race.active) nextTarget(); });
   $("#harderBtn").addEventListener("click",()=>{ S.skill=Math.min(MAX_SKILL,S.skill+1); history=[]; checkUnlock(); applyKeyboardReveal(); save(); openGear(); if(race.active) nextTarget(); });
-  $("#resetBtn").addEventListener("click",()=>{ localStorage.removeItem(SAVE_KEY); S=Object.assign({},DEFAULT); S.unlocked=freshUnlocked(); history=[]; lastWords=[]; race.paceMs=6000;
+  $("#resetBtn").addEventListener("click",()=>{ localStorage.removeItem(SAVE_KEY); S=Object.assign({},DEFAULT); S.unlocked=freshUnlocked(); history=[]; lastWords=[];
     applyPrefs(); selectBuddy(S.buddy); $("#grownup").classList.add("hidden"); $("#coins").textContent=0; stopSceneLoop(); race.active=false; showScreen("start"); });
 
   // physical keyboard — drives both the overworld (arrows) and the typing levels
