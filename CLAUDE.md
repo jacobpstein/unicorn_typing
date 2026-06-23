@@ -71,9 +71,11 @@ The difficulty adapts and proper finger placement is eased in over time.
   `visualStory`/`visualPlay`/`visualHands`/`visualMap`. Shown once via `S.seenIntro`.
 - **SCENE** — `<canvas id="scene">` (320×140 backing, upscaled `image-rendering:pixelated`)
   drawn in a rAF loop: parallax hills/clouds, checker ground, and (for the platformer)
-  obstacles + a flagpole, or (for the boss) the boss creature. The hero (chosen buddy emoji)
-  hops obstacle‑to‑obstacle as she types; `scene.anim.arc` sets the jump height (big over a
-  gap/spring). Camera follows the hero.
+  obstacles + a flagpole, or (for the boss) the boss creature. The hero is a **hand‑drawn
+  pixel unicorn sprite** (`drawHero`/`px`/`heroPal`, NES‑style with animated legs, rainbow
+  mane/tail, horn — *not* an emoji; mane palette varies by `S.buddy`); used in the platformer,
+  boss, and on the map. It hops obstacle‑to‑obstacle as she types; `scene.anim.arc` sets the
+  jump height (big over a gap/spring) and `air` tucks the legs. Camera follows the hero.
 - **TARGET/TYPING** — `handleChar` (the core input handler, used by both physical keydown
   and on‑screen taps), `completeTarget`, hint timing in `armHint`.
 - **LEVEL FLOW** — every node has a `kind`. The **main path is `plat`** (even levels); odd

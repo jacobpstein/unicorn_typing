@@ -276,6 +276,45 @@
   function r(x,y,w,h,c){ X.fillStyle=c; X.fillRect(x|0,y|0,Math.ceil(w),Math.ceil(h)); }
   function emoji(ch,x,y,size){ X.font=size+"px serif"; X.textAlign="center"; X.textBaseline="alphabetic"; X.fillText(ch,x,y); }
 
+  // ===== hand-drawn pixel unicorn sprite (NES-style), facing right, with legs =====
+  function px(ctx,x,y,w,h,c){ ctx.fillStyle=c; ctx.fillRect(Math.round(x),Math.round(y),Math.max(1,Math.round(w)),Math.max(1,Math.round(h))); }
+  const RAINBOW6=["#ff5f6e","#ff9f43","#ffe24d","#4fd16a","#4ba3ff","#b07cff"];
+  function heroPal(b){
+    if(b==="🩰") return {body:"#ffe6f3",sh:"#f6c9e2",mane:["#ff8fc0","#ff6fae","#ff8fc0","#ffa6d0","#ff6fae","#ff8fc0"],horn:"#ff7ab0"};
+    if(b==="🍓") return {body:"#ffd9df",sh:"#f3b6bf",mane:["#ff5f6f","#ff7f5f","#ff5f6f","#ff8f7f","#ff5f6f","#ff7f8f"],horn:"#ff5f6f"};
+    if(b==="🐱") return {body:"#ffe2c4",sh:"#f3c79a",mane:["#ffb74d","#ffa64d","#ffc14d","#ffb74d","#ffa64d","#ffc14d"],horn:"#ffb347"};
+    return {body:"#fdf2ff",sh:"#e9d4f2",mane:RAINBOW6,horn:"#ffd84d"};   // unicorn / rainbow
+  }
+  // cx = centre, by = feet baseline; frame 0/1 = walk cycle; air = legs tucked (mid-jump)
+  function drawHero(ctx,cx,by,frame,air,buddy){
+    const P=heroPal(buddy||S.buddy), EYE="#3a2a5a", HOOF="#b79bd8";
+    const legH=air?3:5;
+    const lift = air ? [0,0,0,0] : (frame ? [2,0,2,0] : [0,2,0,2]);
+    const legX=[cx-7,cx-4,cx+2,cx+5];
+    // tail (behind body)
+    for(let i=0;i<6;i++) px(ctx, cx-11-(i&1), by-legH-7+i*2, 3, 2, P.mane[i]);
+    // legs
+    legX.forEach((lx,i)=>{ px(ctx, lx, by-legH+lift[i], 2, legH-lift[i], P.body); px(ctx, lx, by-1, 2, 1, HOOF); });
+    // body
+    px(ctx, cx-8, by-legH-6, 14, 7, P.body);
+    px(ctx, cx-7, by-legH, 12, 1, P.sh);            // belly shade
+    px(ctx, cx-9, by-legH-5, 1, 4, P.body);         // rump round
+    // neck + head (front = right)
+    px(ctx, cx+3, by-legH-11, 5, 7, P.body);        // neck
+    px(ctx, cx+6, by-legH-15, 7, 6, P.body);        // head
+    px(ctx, cx+12, by-legH-13, 3, 3, P.body);       // muzzle
+    px(ctx, cx+13, by-legH-11, 1, 1, P.sh);         // nostril
+    px(ctx, cx+6, by-legH-17, 2, 3, P.body);        // ear
+    // mane down the back of the neck
+    for(let i=0;i<6;i++) px(ctx, cx, by-legH-16+i*2, 4, 2, P.mane[i]);
+    px(ctx, cx+8, by-legH-17, 3, 2, P.mane[0]);     // forelock
+    // horn
+    px(ctx, cx+10, by-legH-20, 2, 4, P.horn); px(ctx, cx+11, by-legH-22, 1, 2, P.horn);
+    // eye + cheek
+    px(ctx, cx+9, by-legH-13, 2, 2, EYE);
+    px(ctx, cx+10, by-legH-10, 2, 1, "#ffb6d8");
+  }
+
   function startSceneLoop(){ if(scene.running) return; scene.running=true; scene.raf=requestAnimationFrame(drawScene); }
   function stopSceneLoop(){ scene.running=false; cancelAnimationFrame(scene.raf); }
 
@@ -314,8 +353,8 @@
       emoji(scene.world.boss.emoji, bx, by-bob, 52*sc);
       if(scene.bossHappy){ emoji("💖",bx-22,by-40,14); emoji("✨",bx+22,by-44,14); }
       // hero faces boss
-      emoji(buddyFace(), 60, GROUND_Y+6-hop, 26);
-      emoji("⭐", 60, GROUND_Y-22-hop, 10);
+      drawHero(X, 60, GROUND_Y+8-hop, Math.floor(ts/200)%2, false, S.buddy);
+      emoji("⭐", 60, GROUND_Y-28-hop, 10);
     } else {
       // ===== platformer: pits, obstacles, flagpole, hero with jump arc =====
       // pits (gaps): carve an abyss into the ground
@@ -332,7 +371,7 @@
       // flagpole goal (Mario-style)
       const fx=scene.flagX-cam; if(fx>-24 && fx<VW+24){ r(fx,GROUND_Y-46,2,54,"#9a9a9a"); emoji("🚩",fx+7,GROUND_Y-34,12); emoji(scene.world.goal, fx+4, GROUND_Y+8, 22); }
       // hero (hop reflects the jump arc set on scene.anim)
-      emoji(buddyFace(), scene.heroRenderX-cam, GROUND_Y+8-hop, 24);
+      drawHero(X, scene.heroRenderX-cam, GROUND_Y+8-hop, Math.floor(ts/150)%2, !!scene.anim, S.buddy);
     }
 
     drawFloaters(ts,cam);
@@ -569,7 +608,7 @@
       if(meta.boss) memoji(w.boss.emoji,x,y+7,17); else if(locked) memoji("🔒",x,y+6,12); else if(done) memoji("⭐",x,y+7,14); else if(meta.kind==="dots") memoji("🎨",x,y+6,14); else if(meta.kind==="maze") memoji("🧩",x,y+6,14); else memoji(String(meta.idx+1),x,y+6,13);
     }
     // hero on top of current node
-    memoji(buddyFace(), hero.x-cam, hero.y-12, 22);
+    drawHero(MX, hero.x-cam, hero.y+6, Math.floor(ts/150)%2, false, S.buddy);
     // "press play" bubble when standing still
     if(!hero.walking){ const x=hero.x-cam, by=hero.y-50; const bw=62,bh=15; MX.fillStyle="#fff"; MX.strokeStyle="#3a2a5a"; MX.lineWidth=2; MX.fillRect(x-bw/2,by,bw,bh); MX.strokeRect(x-bw/2,by,bw,bh); MX.fillStyle="#3a2a5a"; MX.font="bold 9px ui-monospace,monospace"; MX.textAlign="center"; MX.fillText("PRESS ↵",x,by+11); }
     omap.raf=requestAnimationFrame(drawMap);
