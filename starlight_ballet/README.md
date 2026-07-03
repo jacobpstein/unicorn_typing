@@ -24,14 +24,23 @@ Open `index.html` in a browser. No build, no dependencies, works offline over `f
 - **Spell the Steps**: an emoji + spoken word (built-in speech synthesis). The word
   is never shown to copy — it *peeks* for ~2.5s then hides (higher skill: picture +
   voice only, 3-letter → 8-letter words). Each letter = a dance step; a miss or
-  being stuck reveals the next letter. Every word moves Stella across the stage
+  being stuck reveals the next letter. Every word moves Ruby across the stage
   toward the goal star while the audience cheers.
 - **Count the Beats**: addition → subtraction → mixed → missing-number → numerals-
   only mental math, answered on a number pad. Emoji groups are there to count *on*;
   a wrong answer triggers a count-along hint (and conjures a helper grid in
   numerals-only mode) — never a fail.
-- **Costume Closet**: each act unlocks a visually distinct costume (palettes,
-  striped tutus, tiaras, swan wings, gold sparkles) that recolors Ruby's sprite.
+- **Grand Finale**: a shuffled dance routine that grows one move per act
+  (Act 1 = 4 moves … the Gala = 8), always ending with a bow — cheers and
+  sparkles escalate move by move, and applause (filtered noise) caps every scene.
+- **Costume Closet**: each act's finale unlocks a visually distinct costume
+  (palettes, striped tutus, tiaras, swan wings, gold sparkles) that recolors
+  Ruby's sprite. Roses are a real currency too: bonus costumes (Rainbow Magic,
+  Unicorn Dream) unlock at rose milestones, and locked closet slots telegraph
+  their goal (act icon or 🌹 count).
+- **Endings that land**: every scene closes with Ruby running to the goal star,
+  grabbing it in a sparkle burst and bowing before the star card appears; the
+  final Gala finale plays a special "Prima Ballerina" storybook ending.
 
 ## Guts
 Three plain files (`index.html` / `styles.css` / `game.js`, one IIFE). Progress

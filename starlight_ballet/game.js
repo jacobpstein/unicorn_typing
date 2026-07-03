@@ -69,7 +69,13 @@ const COSTUMES={
   head:[[-1,-1,"#ffd76a"],[0,-2,"#ffd76a"],[1,-1,"#ffd76a"]]},
  gold:{l:"#e8b23a",t:"#ffe9a8",p:"#fff1c8",name:"Golden Star",sparkle:"#ffffff",
   head:[[-2,-1,"#ffd76a"],[-1,-2,"#ffd76a"],[0,-1,"#ffd76a"],[1,-2,"#ffd76a"],[2,-1,"#ffd76a"]]},
+ /* bonus costumes bought with roses — the audience's gifts add up to something! */
+ rainbow:{l:"#ff5a8a",t:"#ffd76a",p:"#7ae0c3",name:"Rainbow Magic",rainbow:true,roses:30,
+  head:[[-1,-1,"#ff5a5a"],[0,-2,"#ffd76a"],[1,-1,"#5ab0ff"]]},
+ unicorn:{l:"#c9a2f0",t:"#ffffff",p:"#ffd76a",name:"Unicorn Dream",stripe:"#f0e2ff",sparkle:"#ffd7ec",roses:80,
+  head:[[-1,-1,"#ff9ec2"],[1,-1,"#a0e8ff"],[0,-2,"#ffd76a"],[0,-3,"#ffe9a8"]]},
 };
+const RAINBOW_T=["#ff5a5a","#ff9a3a","#ffd75a","#5ad07a","#5ab0ff","#b07af0"];
 const SKIN="#ffd9b8", HAIR="#6b4226";
 
 /* Ballerina pixel poses (18 wide). h hair, f face, l leotard, t tutu, s skin, p shoe */
@@ -242,6 +248,17 @@ function sndFanfare(){
  const ac=actx(); if(!ac)return; const t=ac.currentTime;
  [[523,0],[659,.12],[784,.24],[1047,.36],[784,.52],[1047,.62]].forEach(([f,d])=>{tone(f,0.3,t+d,"triangle",0.11);tone(f/2,0.3,t+d,"sine",0.07);});
 }
+/* filtered noise = a real theater APPLAUSE for the little recital star */
+function sndApplause(dur){
+ const ac=actx(); if(!ac||S.muted)return;
+ const len=Math.floor(ac.sampleRate*(dur||1.5)), buf=ac.createBuffer(1,len,ac.sampleRate);
+ const d=buf.getChannelData(0);
+ for(let i=0;i<len;i++){const t=i/len;d[i]=(Math.random()*2-1)*Math.pow(1-t,1.4)*(0.35+0.65*Math.random());}
+ const src=ac.createBufferSource(); src.buffer=buf;
+ const f=ac.createBiquadFilter(); f.type="bandpass"; f.frequency.value=1500; f.Q.value=0.5;
+ const g=ac.createGain(); g.gain.value=0.22;
+ src.connect(f); f.connect(g); g.connect(ac.destination); src.start();
+}
 /* gentle music-box waltz loop */
 const WALTZ_BASS=[130.81,98.00,110.00,98.00];
 const WALTZ_MEL=[[523,659,784],[659,0,784],[880,784,659],[784,0,0],[659,784,880],[1047,0,880],[784,659,587],[523,0,0]];
@@ -291,6 +308,24 @@ function bumpSkill(track,ok){
  save();
 }
 
+/* ================= ROSES ================= */
+/* Roses are the audience's love — and they add up to real gifts:
+   bonus costumes unlock at rose milestones so every 🌹 counts. */
+function gainRoses(n){
+ S.roses+=n; save(); updatePills();
+ Object.keys(COSTUMES).forEach(k=>{
+  const c=COSTUMES[k];
+  if(c.roses&&S.roses>=c.roses&&!S.closet.includes(k)){
+   S.closet.push(k); save();
+   setTimeout(()=>{
+    sndItemGet(); confetti();
+    toast(`🌹×${c.roses}! New costume: ${c.name}! Find it in the closet!`);
+    speak(`Wow, ${c.roses} roses! You earned the ${c.name} costume!`);
+   },600);
+  }
+ });
+}
+
 /* ================= BALLERINA SPRITE ================= */
 function drawBallerina(g,cx,feetY,sc,pose,sx,costumeKey){
  const grid=POSES[pose]||POSES.stand;
@@ -306,6 +341,7 @@ function drawBallerina(g,cx,feetY,sc,pose,sx,costumeKey){
    if(ch==="."||!map[ch])continue;
    let col=map[ch];
    if(ch==="t"){
+    if(c.rainbow)col=RAINBOW_T[(x+y)%RAINBOW_T.length];
     if(c.stripe&&x%2===0)col=c.stripe;
     if(c.sparkle&&(x*3+y*5)%7===0)col=c.sparkle;
    }
@@ -376,12 +412,17 @@ function drawStage(ts){
  scene.hx+=(scene.hxT-scene.hx)*Math.min(1,dt*3.5);
  if(Math.abs(scene.hxT-scene.hx)>4&&Math.random()<0.4)
   scene.particles.push({type:"spark",x:scene.hx-10,y:168,vx:-30,vy:-20-rnd(30),life:0.5+Math.random()*0.3});
- /* goal star on its pedestal, stage right */
+ /* goal star on its pedestal, stage right — once grabbed it dances above Ruby */
  if(scene.kind!=="finale"&&scene.kind!=="studio"){
   g.fillStyle="#8a5a9a"; g.fillRect(418,160,26,12);
   g.fillStyle="#6a4078"; g.fillRect(421,156,20,4);
   g.font="17px sans-serif"; g.textAlign="center";
-  g.globalAlpha=0.7+0.3*Math.sin(ts/180); g.fillText("⭐",431,154); g.globalAlpha=1;
+  if(scene.starGone){
+   g.font="24px sans-serif";
+   g.fillText("⭐",scene.hx,94+Math.sin(ts/140)*4);
+  }else{
+   g.globalAlpha=0.7+0.3*Math.sin(ts/180); g.fillText("⭐",431,154); g.globalAlpha=1;
+  }
  }
  /* spotlight */
  const hx=scene.hx, hy=170;
@@ -514,7 +555,10 @@ function renderProgram(){
   const cv=document.createElement("canvas"); cv.width=18*3; cv.height=16*3+6;
   drawBallerina(cv.getContext("2d"),cv.width/2,cv.height-2,3,"stand",1,k);
   b.appendChild(cv);
-  const lb=document.createElement("span"); lb.textContent=owned?COSTUMES[k].name:"🔒";
+  const lb=document.createElement("span");
+  if(owned)lb.textContent=COSTUMES[k].name;
+  else if(COSTUMES[k].roses)lb.textContent=`🔒 🌹×${COSTUMES[k].roses}`;
+  else{const src=ACTS.find(a=>a.costume===k);lb.textContent="🔒 "+(src?src.icon:"");}
   b.appendChild(lb);
   b.onclick=()=>{S.costume=k;save();renderProgram();sndStep(2);};
   cr.appendChild(b);
@@ -561,10 +605,26 @@ function renderProgress(){
  const row=$("progressRow"); row.innerHTML="";
  for(let i=0;i<scene.total;i++){
   const s=document.createElement("span");
-  s.className="p-dot"+(i<scene.i?" won":"");
+  s.className="p-dot"+(i<scene.i?" won":i===scene.i?" cur":"");
   s.textContent=scene.kind==="math"?"🌟":scene.kind==="rhyme"?"🎶":"🌹";
   row.appendChild(s);
  }
+}
+/* The Mario moment: after the last answer Ruby runs to the goal star,
+   grabs it in a burst of sparkles and takes a bow — THEN the card appears. */
+function goalMoment(){
+ if(!scene)return;
+ $("prompt").innerHTML="";
+ $("inputArea").innerHTML="";
+ scene.hxT=404;
+ scene.cheerUntil=performance.now()+2600;
+ setTimeout(()=>{
+  if(!scene)return;
+  scene.starGone=true;
+  spawnSparkles(30,414,150); spawnRoses(4);
+  sndStar(); setPose("bow",1400);
+ },750);
+ setTimeout(()=>{if(scene)finishScene();},1800);
 }
 function finishScene(){
  stopWaltz();
@@ -576,15 +636,16 @@ function finishScene(){
  }
  const prev=S.stars[sceneIndex]||0;
  S.stars[sceneIndex]=Math.max(prev,stars);
- let costumeMsg="";
+ let costumeMsg="", champion=false;
  if(sceneIndex===S.progress){
   S.progress=Math.min(TOTAL,S.progress+1);
   if(scene.kind==="finale"){
    const c=scene.act.costume;
    if(!S.closet.includes(c)){S.closet.push(c);costumeMsg=c;}
+   champion=S.progress>=TOTAL; /* she just finished the Starlight Gala! */
   }
  }
- save(); updatePills(); sndFanfare(); confetti();
+ save(); updatePills(); sndFanfare(); sndApplause(champion?2.8:1.6); confetti();
  /* celebrate overlay */
  $("celeStars").innerHTML="⭐".repeat(stars).split("").map(s=>`<span>${s}</span>`).join("");
  $("celeTitle").textContent=scene.kind==="finale"?`${HERO} takes a bow! ${scene.act.icon}`:PRAISE[rnd(PRAISE.length)];
@@ -605,7 +666,18 @@ function finishScene(){
   speak(`You earned a new costume! ${c.name}!`);
  }
  $("btnNext").style.display=S.progress<TOTAL?"":"none";
- $("celebrate").classList.add("show");
+ if(champion){
+  /* THE dream-come-true ending: fireworks of confetti + a storybook finish */
+  $("celeTitle").textContent="👑 PRIMA BALLERINA! 👑";
+  $("celeMsg").textContent=`Ruby's big dream came true — because YOU practiced with her, every step of the way! 🌹 ${S.roses}`;
+  setTimeout(confetti,900); setTimeout(confetti,1800);
+  setTimeout(()=>{
+   showStory([
+    {title:"👑 Prima Ballerina!",pose:"leap",text:"She did it! Ruby danced the whole Starlight Gala, and the crowd cheered louder than thunder!"},
+    {title:"A dream come true ⭐",pose:"fifth",twirl:true,text:"Every word you spelled and every number you counted became one of Ruby's dance steps. Big dreams take practice — and you practiced! Keep dancing in the studio, and collect every costume!"},
+   ],()=>{sndItemGet();confetti();$("celebrate").classList.add("show");});
+  },1200);
+ }else $("celebrate").classList.add("show");
 }
 
 /* ================= SPELLING ================= */
@@ -676,6 +748,7 @@ function glowSpellHint(){
 }
 function handleSpellKey(ch){
  if(!scene||scene.kind!=="spell"||!scene.word)return;
+ if(scene.typed>=scene.word.length)return; /* happy keys during the win pause aren't misses */
  if($("celebrate").classList.contains("show"))return;
  ch=ch.toUpperCase();
  const expect=scene.word[scene.typed];
@@ -700,7 +773,7 @@ function handleSpellKey(ch){
 function wordDone(){
  scene.firstTries.push(scene.firstTry?1:0);
  bumpSkill("spell",scene.firstTry);
- S.roses++; save(); updatePills();
+ gainRoses(1);
  praise(); sndWord(); doTwirl(900);
  spawnSparkles(14,scene.hx||stage.width/2,150);
  spawnRoses(2);
@@ -710,7 +783,7 @@ function wordDone(){
  renderProgress();
  setTimeout(()=>{
   if(!scene||scene.kind!=="spell")return;
-  if(scene.i>=scene.total)finishScene(); else nextWord();
+  if(scene.i>=scene.total)goalMoment(); else nextWord();
  },1100);
 }
 
@@ -797,7 +870,7 @@ function mathSubmit(){
   const a=$("mAns"); a.classList.add("fill"); a.textContent=scene.prob.ans;
   scene.firstTries.push(scene.firstTry?1:0);
   bumpSkill("math",scene.firstTry);
-  S.roses++; save(); updatePills();
+  gainRoses(1);
   praise(); sndStar(); setPose("leap",700);
   spawnSparkles(12,scene.hx||stage.width/2,150);
   spawnRoses(2);
@@ -808,7 +881,7 @@ function mathSubmit(){
   scene.prob=null;
   setTimeout(()=>{
    if(!scene||scene.kind!=="math")return;
-   if(scene.i>=scene.total)finishScene(); else nextProb();
+   if(scene.i>=scene.total)goalMoment(); else nextProb();
   },1000);
  }else{
   scene.firstTry=false; scene.misses++;
@@ -884,7 +957,7 @@ function pickRhyme(btn){
   const r=scene.rhyme; scene.rhyme=null;
   scene.firstTries.push(scene.firstTry?1:0);
   bumpSkill("spell",scene.firstTry); /* rhymes feed the word track */
-  S.roses++; save(); updatePills();
+  gainRoses(1);
   praise(); sndWord(); doTwirl(900);
   spawnSparkles(14,scene.hx||240,150); spawnRoses(2);
   scene.cheerUntil=performance.now()+1300;
@@ -892,7 +965,7 @@ function pickRhyme(btn){
   speak(`${r.target[0].toLowerCase()} rhymes with ${r.correct[0].toLowerCase()}!`);
   setTimeout(()=>{
    if(!scene||scene.kind!=="rhyme")return;
-   if(scene.i>=scene.total)finishScene(); else nextRhyme();
+   if(scene.i>=scene.total)goalMoment(); else nextRhyme();
   },1300);
  }else{
   scene.firstTry=false;
@@ -940,36 +1013,57 @@ function studioMove(k){
 }
 
 /* ================= FINALE ================= */
-const FIN_MOVES=[["T","TWIRL"],["L","LEAP"],["P","PLIÉ"],["B","BOW"]];
+/* A real routine, not four fixed presses: shuffled moves, one more per act
+   (Act 1 = 4 … Gala = 8), always ending with a BOW. The crowd cheers louder
+   and the sparkles grow with every move — an escalating boss celebration. */
+const FIN_POOL=[["T","TWIRL"],["L","LEAP"],["P","PLIÉ"],["A","ARABESQUE"],["S","SPARKLE"]];
 function setupFinale(){
- scene.mi=0; scene.total=FIN_MOVES.length; scene.i=0;
+ const a=Math.floor(sceneIndex/PER_ACT);
+ let seq=shuffle(FIN_POOL);
+ while(seq.length<3+a)seq=seq.concat(shuffle(FIN_POOL));
+ seq=seq.slice(0,3+a);
+ for(let i=1;i<seq.length;i++)if(seq[i][0]===seq[i-1][0]) /* no move twice in a row */
+  for(let j=i+1;j<seq.length;j++)if(seq[j][0]!==seq[i-1][0]){[seq[i],seq[j]]=[seq[j],seq[i]];break;}
+ seq.push(["B","BOW"]); /* every routine ends with a bow */
+ scene.finSeq=seq; scene.mi=0; scene.total=seq.length; scene.i=0;
  $("inputArea").innerHTML="";
  renderProgress();
  nextMove();
 }
 function nextMove(){
- const [k,w]=FIN_MOVES[scene.mi];
+ const [k,w]=scene.finSeq[scene.mi];
  $("prompt").innerHTML=`<div class="fin-card">
    <div class="fin-word">Press the key to ${w}!</div>
    <div class="fin-key">${k}</div></div>`;
+ document.querySelector(".fin-key").onclick=()=>{actx();handleFinaleKey(k);};
  speak(w==="PLIÉ"?"plee-ay":w.toLowerCase());
 }
 function handleFinaleKey(ch){
  if($("celebrate").classList.contains("show"))return;
- const [k,w]=FIN_MOVES[scene.mi];
- if(ch.toUpperCase()!==k)return;
+ if(!scene.finSeq||scene.mi>=scene.finSeq.length)return;
+ const [k,w]=scene.finSeq[scene.mi];
+ if(ch.toUpperCase()!==k){
+  /* gentle nudge — the key card wiggles so she knows to look at it */
+  const el=document.querySelector(".fin-key");
+  if(el){el.classList.remove("wiggle");void el.offsetWidth;el.classList.add("wiggle");}
+  sndOops(); return;
+ }
  sndWord(); praise();
- scene.cheerUntil=performance.now()+1300;
+ scene.cheerUntil=performance.now()+1300+scene.mi*250;
  if(w==="TWIRL")doTwirl(1100);
  else if(w==="LEAP")setPose("leap",800);
  else if(w==="PLIÉ")setPose("plie",800);
+ else if(w==="ARABESQUE")setPose("arabesque",900);
+ else if(w==="SPARKLE")doTwirl(700);
  else setPose("bow",1000);
- spawnSparkles(14,stage.width/2,150);
+ spawnSparkles(12+scene.mi*4,stage.width/2,150);
+ if(w==="SPARKLE")spawnSparkles(20,stage.width/2,150);
  scene.mi++; scene.i++; renderProgress();
- if(scene.mi>=FIN_MOVES.length){
+ if(scene.mi>=scene.finSeq.length){
   $("prompt").innerHTML=`<div class="fin-card"><div class="fin-word">🌹 The crowd throws roses! 🌹</div></div>`;
-  spawnRoses(26); S.roses+=5; save(); updatePills();
-  scene.firstTries=[1,1,1,1];
+  spawnRoses(26); gainRoses(5);
+  sndApplause(2.4);
+  scene.cheerUntil=performance.now()+2600;
   setTimeout(()=>{if(scene&&scene.kind==="finale")finishScene();},2600);
  }else setTimeout(nextMove,900);
 }
