@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Starlight Ballet — a spelling &amp; math recital</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ===== TITLE ===== -->
+<section id="title" class="screen active">
+  <div class="title-card">
+    <canvas id="titleCanvas" width="300" height="150"></canvas>
+    <h1>Starlight <em>Ballet</em></h1>
+    <p class="tag">help Ruby reach her ballerina dream ✨</p>
+    <button id="btnPlay" class="big-btn">🩰 Dance!</button>
+  </div>
+</section>
+
+<!-- ===== RECITAL PROGRAM (map) ===== -->
+<section id="program" class="screen">
+  <header class="bar">
+    <h2>🎀 Recital Program</h2>
+    <div class="stats">
+      <span id="roseCount" class="pill">🌹 0</span>
+      <span id="starCount" class="pill">⭐ 0</span>
+      <button id="btnStory" class="icon-btn" title="Story">📖</button>
+      <button id="btnMute" class="icon-btn" title="Sound">🔊</button>
+    </div>
+  </header>
+  <div id="acts"></div>
+  <button id="btnStudio" class="big-btn alt studio-btn">💃 Dance Studio — free play!</button>
+  <div id="badges">
+    <h3>🏅 Recital Badges</h3>
+    <div id="badgeRow"></div>
+  </div>
+  <div id="closet">
+    <h3>👗 Costume Closet</h3>
+    <div id="closetRow"></div>
+  </div>
+</section>
+
+<!-- ===== LEVEL ===== -->
+<section id="level" class="screen">
+  <header class="bar">
+    <button id="btnBack" class="icon-btn wide">🎀 Program</button>
+    <h2 id="levelTitle"></h2>
+    <div class="stats">
+      <span id="roseCount2" class="pill">🌹 0</span>
+      <button id="btnMute2" class="icon-btn" title="Sound">🔊</button>
+    </div>
+  </header>
+  <div id="stageWrap">
+    <canvas id="stage" width="480" height="200"></canvas>
+    <div id="praise"></div>
+  </div>
+  <div id="progressRow"></div>
+  <div id="prompt"></div>
+  <div id="inputArea"></div>
+  <div id="celebrate" class="overlay">
+    <div class="cele-card">
+      <div id="celeStars"></div>
+      <h2 id="celeTitle"></h2>
+      <p id="celeMsg"></p>
+      <div id="celeCostume"></div>
+      <div class="cele-btns">
+        <button id="btnNext" class="big-btn">Next scene ▶</button>
+        <button id="btnProgram" class="big-btn alt">🎀 Program</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div id="story" class="overlay">
+  <div class="cele-card story-card">
+    <h2 id="storyTitle"></h2>
+    <canvas id="storyCanvas" width="240" height="120"></canvas>
+    <p id="storyText"></p>
+    <button id="storyBtn" class="big-btn">Next ▶</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script src="game.js"></script>
+</body>
+</html>
