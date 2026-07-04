@@ -23,13 +23,14 @@ Open `index.html` in a browser. No build, no dependencies, works offline over `f
   moves, S for sparkles, R for roses, arrow keys to move Ruby around the stage.
 - **Spell the Steps**: an emoji + spoken word (built-in speech synthesis). The word
   is never shown to copy — it *peeks* for ~2.5s then hides (higher skill: picture +
-  voice only, 3-letter → 8-letter words). Each letter = a dance step; a miss or
-  being stuck reveals the next letter. Every word moves Ruby across the stage
-  toward the goal star while the audience cheers.
+  voice only, 3-letter → 8-letter words). Each letter = a dance step. **No automatic
+  hints**: misses just wiggle (and ease the adaptive skill); her self-serve helpers
+  are 🔊 Hear it and 👀 Peek (a peek counts against first-try, like a miss). Every
+  word moves Ruby across the stage toward the goal star while the audience cheers.
 - **Count the Beats**: addition → subtraction → mixed → missing-number → numerals-
-  only mental math, answered on a number pad. Emoji groups are there to count *on*;
-  a wrong answer triggers a count-along hint (and conjures a helper grid in
-  numerals-only mode) — never a fail.
+  only mental math, answered on a number pad. Emoji groups are there to count *on*.
+  **No answer hints** — a miss on a numerals-only problem just reveals the plain
+  emoji objects so the counting stays hers; misses ease the skill instead.
 - **Grand Finale**: a shuffled dance routine that grows one move per act
   (Act 1 = 4 moves … the Gala = 8), always ending with a bow — cheers and
   sparkles escalate move by move, and applause (filtered noise) caps every scene.

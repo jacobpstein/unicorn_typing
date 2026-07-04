@@ -681,7 +681,7 @@ function finishScene(){
 }
 
 /* ================= SPELLING ================= */
-let peekTimer=null,hintTimer=null;
+let peekTimer=null;
 function setupSpell(){
  const st=spellStage(S.spell);
  scene.mode=st.mode;
@@ -704,13 +704,16 @@ function buildKeyboard(){
  });
 }
 function nextWord(){
- clearTimeout(peekTimer); clearTimeout(hintTimer);
+ clearTimeout(peekTimer);
  const [word,emoji]=scene.items[scene.i];
  scene.word=word; scene.emoji=emoji; scene.typed=0; scene.misses=0; scene.firstTry=true;
  renderProgress();
  const pr=$("prompt");
  pr.innerHTML=`<div class="spell-row"><span class="big-emoji">${emoji}</span><div class="slots" id="slots"></div></div>
-   <button class="hear-btn" id="btnHear">🔊 Hear it</button>`;
+   <div class="help-row">
+     <button class="hear-btn" id="btnHear">🔊 Hear it</button>
+     <button class="hear-btn" id="btnPeek">👀 Peek</button>
+   </div>`;
  const slots=$("slots");
  word.split("").forEach(()=>{
   const s=document.createElement("div"); s.className="slot";
@@ -725,26 +728,22 @@ function nextWord(){
   },2600);
  }
  $("btnHear").onclick=()=>speak(word.toLowerCase());
+ $("btnPeek").onclick=()=>{actx();peekWord();};
  speak(word.toLowerCase());
- armSpellHint();
 }
-/* No free hints: she tries first. The next letter is revealed only after a
-   miss (handleSpellKey) or after she's been stuck a while. */
-function armSpellHint(){
- clearTimeout(hintTimer);
- unglowKeys();
- hintTimer=setTimeout(glowSpellHint,7000);
-}
-function unglowKeys(){document.querySelectorAll(".kb-key.glow").forEach(k=>k.classList.remove("glow"));
- document.querySelectorAll(".slot.hintg").forEach(s=>s.classList.remove("hintg"));}
-function glowSpellHint(){
- if(!scene||scene.kind!=="spell"||scene.typed>=scene.word.length)return;
- const ch=scene.word[scene.typed];
- const k=document.querySelector(`.kb-key[data-ch="${ch}"]`);
- if(k)k.classList.add("glow");
- /* reveal the needed letter in its slot too */
- const slot=$("slots")&&$("slots").children[scene.typed];
- if(slot){slot.querySelector(".ghost").textContent=ch;slot.classList.add("hintg");}
+/* NO automatic hints — the game adapts instead (a missed word eases the skill
+   down right away). Her self-serve helpers are the 🔊 and 👀 buttons; peeking
+   counts like a miss so stars and the adaptive tracks stay honest. */
+function peekWord(){
+ if(!scene||scene.kind!=="spell"||!scene.word)return;
+ scene.firstTry=false;
+ const slots=$("slots"); if(!slots)return;
+ [...slots.children].forEach((s,j)=>{const g=s.querySelector(".ghost");if(g)g.textContent=scene.word[j];});
+ clearTimeout(peekTimer);
+ peekTimer=setTimeout(()=>{
+  const sl=$("slots"); if(!sl||!scene||scene.kind!=="spell")return;
+  [...sl.children].forEach((s,j)=>{const g=s.querySelector(".ghost");if(g&&j>=scene.typed)g.textContent="";});
+ },1400);
 }
 function handleSpellKey(ch){
  if(!scene||scene.kind!=="spell"||!scene.word)return;
@@ -754,20 +753,16 @@ function handleSpellKey(ch){
  const expect=scene.word[scene.typed];
  if(ch===expect){
   const slot=$("slots").children[scene.typed];
-  slot.classList.remove("hintg");
   slot.innerHTML=expect; slot.classList.add("fill");
   sndStep(scene.typed);
   setPose(["plie","fifth","arabesque"][scene.typed%3],650);
   scene.typed++;
-  unglowKeys();
   if(scene.typed>=scene.word.length)wordDone();
-  else armSpellHint();
  }else{
   scene.firstTry=false; scene.misses++;
   $("slots").classList.remove("wiggle"); void $("slots").offsetWidth;
   $("slots").classList.add("wiggle");
   sndOops();
-  glowSpellHint();
  }
 }
 function wordDone(){
@@ -850,9 +845,7 @@ function nextProb(){
   eq=`${p.a} + ▢ = ${p.c}`;
  }
  pr.innerHTML=`${html}<div class="m-row"><span class="m-eq">${eq}</span><span class="m-ans" id="mAns">?</span></div>`;
- unglowPad();
 }
-function unglowPad(){document.querySelectorAll(".pad-key.glow").forEach(k=>k.classList.remove("glow"));}
 function renderAns(){const a=$("mAns");if(a)a.textContent=scene.ansStr||"?";}
 function handleDigit(d){
  if(!scene||scene.kind!=="math"||!scene.prob)return;
@@ -889,40 +882,20 @@ function mathSubmit(){
   a.classList.remove("wiggle"); void a.offsetWidth; a.classList.add("wiggle");
   sndOops();
   scene.ansStr=""; setTimeout(renderAns,350);
-  if(scene.misses===1)countAlong();
-  if(scene.misses>=2)glowPadAnswer();
+  if(!scene.prob.visual)showCountHelp();
  }
 }
-/* gentle hint: count the emoji out loud with little number badges.
-   For numerals-only problems, a helper grid appears — practice pays off,
-   but nobody is left stuck. */
-function countAlong(){
+/* NO automatic answer hints (no badges, no glowing pad keys). For
+   numerals-only problems a miss reveals the emoji objects — a manipulative
+   to count on. The counting stays hers; misses ease the skill instead. */
+function showCountHelp(){
  const p=scene.prob; if(!p)return;
- let its=[...document.querySelectorAll("#prompt .m-it:not(.gone)")];
- if(p.kind==="missing")its=[...document.querySelectorAll("#prompt .m-slot:not(.has)")];
- if(!its.length){
-  const d=document.createElement("div"); d.className="m-row";
-  if(p.kind==="add")d.innerHTML=emojiGrid(p.e,p.a)+`<span class="m-op">+</span>`+emojiGrid(p.e,p.b);
-  else if(p.kind==="sub")d.innerHTML=emojiGrid(p.e,p.tot,p.tot-p.take);
-  else d.innerHTML=missingSlotsHtml(p);
-  $("prompt").insertBefore(d,$("prompt").firstChild);
-  its=[...d.querySelectorAll(p.kind==="missing"?".m-slot:not(.has)":".m-it:not(.gone)")];
- }
- its.forEach((el,i)=>{
-  setTimeout(()=>{
-   if(!scene||scene.prob!==p)return;
-   const b=document.createElement("span"); b.className="cnum"; b.textContent=i+1;
-   if(el.classList.contains("m-slot")){el.classList.add("has");el.textContent="✨";}
-   el.style.position="relative"; el.appendChild(b);
-   sndStep(i);
-  },300+i*280);
- });
-}
-function glowPadAnswer(){
- unglowPad();
- const s=String(scene.prob.ans);
- const k=document.querySelector(`.pad-key[data-k="${s[0]}"]`);
- if(k)k.classList.add("glow");
+ if(document.querySelector("#prompt .m-it,#prompt .m-slot"))return;
+ const d=document.createElement("div"); d.className="m-row";
+ if(p.kind==="add")d.innerHTML=emojiGrid(p.e,p.a)+`<span class="m-op">+</span>`+emojiGrid(p.e,p.b);
+ else if(p.kind==="sub")d.innerHTML=emojiGrid(p.e,p.tot,p.tot-p.take);
+ else d.innerHTML=missingSlotsHtml(p);
+ $("prompt").insertBefore(d,$("prompt").firstChild);
 }
 
 /* ================= RHYME TIME (bonus) ================= */

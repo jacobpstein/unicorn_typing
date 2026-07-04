@@ -117,6 +117,7 @@ h1 em{font-style:normal;color:var(--pink2)}
 .slots.wiggle{animation:wig .3s}
 @keyframes wig{25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
 .hear-btn{background:#0005;border:2px solid #ffffff33;border-radius:999px;color:#fff;font-size:15px;padding:5px 14px;margin-top:2px}
+.help-row{display:flex;gap:8px}
 
 /* math */
 .m-row{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap}
