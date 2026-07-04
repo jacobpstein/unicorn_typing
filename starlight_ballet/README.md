@@ -25,7 +25,8 @@ Open `index.html` in a browser. No build, no dependencies, works offline over `f
   is never shown to copy — it *peeks* for ~2.5s then hides (higher skill: picture +
   voice only, 3-letter → 8-letter words). Each letter = a dance step. **No automatic
   hints**: misses just wiggle (and ease the adaptive skill); her self-serve helpers
-  are 🔊 Hear it and 👀 Peek (a peek counts against first-try, like a miss). Every
+  are 🔊 Hear it and 👀 Peek (max two peeks per word, each counts against
+  first-try like a miss). Every
   word moves Ruby across the stage toward the goal star while the audience cheers.
 - **Count the Beats**: addition → subtraction → mixed → missing-number → numerals-
   only mental math, answered on a number pad. Emoji groups are there to count *on*.

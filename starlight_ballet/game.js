@@ -706,13 +706,13 @@ function buildKeyboard(){
 function nextWord(){
  clearTimeout(peekTimer);
  const [word,emoji]=scene.items[scene.i];
- scene.word=word; scene.emoji=emoji; scene.typed=0; scene.misses=0; scene.firstTry=true;
+ scene.word=word; scene.emoji=emoji; scene.typed=0; scene.misses=0; scene.firstTry=true; scene.peeks=0;
  renderProgress();
  const pr=$("prompt");
  pr.innerHTML=`<div class="spell-row"><span class="big-emoji">${emoji}</span><div class="slots" id="slots"></div></div>
    <div class="help-row">
      <button class="hear-btn" id="btnHear">🔊 Hear it</button>
-     <button class="hear-btn" id="btnPeek">👀 Peek</button>
+     <button class="hear-btn" id="btnPeek">👀 Peek ×2</button>
    </div>`;
  const slots=$("slots");
  word.split("").forEach(()=>{
@@ -733,10 +733,19 @@ function nextWord(){
 }
 /* NO automatic hints — the game adapts instead (a missed word eases the skill
    down right away). Her self-serve helpers are the 🔊 and 👀 buttons; peeking
-   counts like a miss so stars and the adaptive tracks stay honest. */
+   counts like a miss so stars and the adaptive tracks stay honest, and each
+   word allows at most two peeks. */
 function peekWord(){
  if(!scene||scene.kind!=="spell"||!scene.word)return;
+ if(scene.peeks>=2)return;
+ scene.peeks++;
  scene.firstTry=false;
+ const btn=$("btnPeek");
+ if(btn){
+  if(scene.peeks>=2){btn.disabled=true;btn.textContent="👀 ✖";}
+  else btn.textContent="👀 Peek ×1";
+ }
+ speak(scene.peeks===1?"You only have one more peek!":"That was your last peek!");
  const slots=$("slots"); if(!slots)return;
  [...slots.children].forEach((s,j)=>{const g=s.querySelector(".ghost");if(g)g.textContent=scene.word[j];});
  clearTimeout(peekTimer);
