@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Secret Tunnel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Fredoka:wght@400;600;700&family=Noto+Sans+Hebrew:wght@700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #1a1026; overflow: hidden; }
+  body { display: flex; align-items: center; justify-content: center; }
+  canvas { display: block; outline: none; touch-action: none; }
+  #parent { position: fixed; inset: 0; display: none; background: rgba(20, 10, 30, .92); color: #fff;
+    font: 16px/1.45 Fredoka, system-ui, sans-serif; overflow: auto; z-index: 5; }
+  #parent .box { max-width: 780px; margin: 32px auto; background: #2d1f40; border-radius: 16px; padding: 24px 28px; }
+  #parent h2 { margin: 0 0 8px; } #parent h3 { margin: 20px 0 6px; color: #ffd36b; }
+  #parent table { border-collapse: collapse; width: 100%; }
+  #parent td, #parent th { padding: 4px 8px; border-bottom: 1px solid #4a3a60; text-align: left; }
+  #parent button, #parent select { font: inherit; padding: 6px 12px; border-radius: 8px; border: 0; margin: 2px 4px 2px 0; cursor: pointer; }
+  #parent .row { margin: 8px 0; }
+</style>
+</head>
+<body>
+<canvas id="cv" tabindex="0"></canvas>
+<div id="parent"></div>
+<script src="js/core.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/pictures.js"></script>
+<script src="js/learn.js"></script>
+<script src="js/art.js"></script>
+<script src="js/world.js"></script>
+<script src="js/panels.js"></script>
+<script src="js/challenges.js"></script>
+<script src="js/jewelry.js"></script>
+<script src="js/story.js"></script>
+<script src="js/overlays.js"></script>
+<script src="js/maps.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
